@@ -1,0 +1,130 @@
+import groovy.json.JsonSlurper
+import groovy.json.JsonOutput
+import groovy.json.JsonBuilder
+
+buildscript {
+    repositories {
+        maven { url = "https://maven.aliyun.com/repository/public" }
+        maven { url = "https://maven.aliyun.com/repository/gradle-plugin" }
+        maven {
+            name = "forge"
+            url = "https://bmclapi2.bangbang93.com/maven"
+        }
+    }
+    dependencies {
+        classpath 'com.anatawa12.forge:ForgeGradle:1.2-1.1.+'
+    }
+}
+
+apply plugin: 'forge'
+
+configurations {
+    embed
+}
+
+dependencies {
+    comAnatawa12GradleForgeGradle1_2Separated 'org.ow2.asm:asm-debug-all:5.2'
+    comAnatawa12GradleForgeGradle1_2Separated 'com.google.guava:guava:21.0'
+    // pinyin search: compile-time classpath + embedded into the mod jar below
+    // (TinyPinyin ships on jitpack only, so the jar is vendored in libs/ and
+    //  the jar task merges the embed configuration — 1.7.10 has no jar-in-jar)
+    compile files('libs/tinypinyin-2.0.3.jar')
+    embed files('libs/tinypinyin-2.0.3.jar')
+    // mixin framework (InfiniStack-style big stacking): dev classpath only, at
+    // runtime the game dir provides UniMixins (the modpack ships it); our jar
+    // only declares the tweaker + mixin config in its manifest
+    compile files('libs/unimixins-all-1.7.10-0.2.1.jar')
+}
+
+// merge the embedded libs into the mod jar
+jar {
+    manifest {
+        attributes(
+                // mixin: register our config; the tweaker itself comes from
+                // UniMixins in the game's mods dir at runtime (dev: runClient args)
+                'TweakClass': 'org.spongepowered.asm.launch.MixinTweaker',
+                'MixinConfigs': 'mixins.wheelchair.json',
+                'ForceLoadAsMod': 'true',
+                'FMLCorePluginContainsFMLMod': 'true'
+        )
+    }
+    from { configurations.embed.collect { it.isDirectory() ? it : zipTree(it) } }
+}
+
+// mixin dev: enable the tweaker in the dev client
+runClient {
+    args "--tweakClass", "org.spongepowered.asm.launch.MixinTweaker"
+}
+
+// mixin annotation processor: MCP->SRG mapping for refmap generation
+// (dev classes carry MCP names; the refmap lets the same jar work reobfuscated)
+def mixinSrg = "${System.getProperty('user.home')}/.gradle/caches/minecraft/net/minecraftforge/forge/1.7.10-10.13.4.1614-1.7.10/srgs/mcp-srg.srg"
+def outRefMap = "${tasks.compileJava.temporaryDir}/mixins.wheelchair.refmap.json"
+tasks.compileJava.options.compilerArgs += ["-AreobfSrgFile=${mixinSrg}", "-AoutRefMapFile=${outRefMap}"]
+
+// The mixin AP only emits mappings for @Inject members — @Overwrite methods
+// (and we avoid @Shadow FIELDS entirely, see MixinItemStack) get NOTHING and
+// the jar dies in production with InvalidMixinException. Post-process the
+// refmap to append them (SRG names verified against mcp-srg.srg).
+def refMapPatches = [
+    'wheelchair/mixin/MixinInventoryPlayer': [
+        'getInventoryStackLimit': 'Lnet/minecraft/entity/player/InventoryPlayer;func_70297_j_()I'],
+    'wheelchair/mixin/MixinInventoryBasic': [
+        'getInventoryStackLimit': 'Lnet/minecraft/inventory/InventoryBasic;func_70297_j_()I'],
+    'wheelchair/mixin/MixinNetHandlerPlayServer': [
+        'processCreativeInventoryAction': 'Lnet/minecraft/network/NetHandlerPlayServer;func_147344_a(Lnet/minecraft/network/play/client/C10PacketCreativeInventoryAction;)V'],
+]
+task patchRefMap {
+    doLast {
+        def f = new File(outRefMap)
+        def mapper = new JsonSlurper()
+        def rm = mapper.parseText(f.text)
+        refMapPatches.each { cls, members ->
+            members.each { name, srg ->
+                rm.mappings[cls] = rm.mappings[cls] ?: [:]
+                rm.mappings[cls][name] = srg
+                rm.data.searge[cls] = rm.data.searge[cls] ?: [:]
+                rm.data.searge[cls][name] = srg
+            }
+        }
+        f.text = JsonOutput.prettyPrint(new JsonBuilder(rm).toString())
+        logger.lifecycle('patched refmap: ' + refMapPatches.keySet())
+    }
+}
+
+jar {
+    dependsOn patchRefMap
+    from outRefMap
+}
+
+version = "0.3.0"
+group = "wheelchair"
+archivesBaseName = "WheelchairMod"
+
+minecraft {
+    version = "1.7.10-10.13.4.1614-1.7.10"
+    runDir = "eclipse"
+}
+
+// sources are UTF-8 (Chinese comments/lang strings)
+[compileJava, compileTestJava]*.options*.encoding = 'UTF-8'
+
+processResources
+{
+    // this will ensure that this task is redone when the versions change.
+    inputs.property "version", project.version
+    inputs.property "mcversion", project.minecraft.version
+
+    // replace stuff in mcmod.info, nothing else
+    from(sourceSets.main.resources.srcDirs) {
+        include 'mcmod.info'
+
+        // replace version and mcversion
+        expand 'version':project.version, 'mcversion':project.minecraft.version
+    }
+
+    // copy everything else, thats not the mcmod.info
+    from(sourceSets.main.resources.srcDirs) {
+        exclude 'mcmod.info'
+    }
+}

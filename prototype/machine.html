@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>轮椅Mod · 机器配置 · 原型 v2 (Mekanism 色块风)</title>
+<style>
+  /* ============================================================
+     机器配置独立小窗 v2 — 参考 Mekanism SideConfig 的色块语言:
+     方向 = 两个大色块(绿=存/机器→池, 蓝=取/池→机器)点击切换,
+     速率 = 分段条, 解除 = 红块。独立窗 176x110 GUI, 无 rail 无背包。
+     1 GUI px = 3 CSS px。
+     ============================================================ */
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#2c2c2c; font-family:"Courier New",monospace; color:#e0e0e0;
+         display:flex; flex-direction:column; align-items:center; padding:18px; }
+  h1 { font-size:15px; color:#9fd49f; margin-bottom:3px; }
+  .sub { font-size:12px; color:#888; margin-bottom:12px; }
+
+  .win { background:#c6c6c6; border:9px solid;
+         border-color:#ffffff #555555 #555555 #ffffff; width:528px; height:330px;
+         position:relative; color:#404040; }
+
+  /* header: machine name + dim/coords, like a machine GUI title row */
+  .head { padding:9px 15px 6px; border-bottom:3px solid #b0b0b0; margin:0 12px; }
+  .head .nm { font-size:27px; color:#303040; }
+  .head .loc { font-size:21px; color:#707070; margin-top:3px; }
+
+  /* ONE cycling direction block (Mekanism config-loop language): green=存,
+     blue=取 — mutually exclusive states of one setting, not two switches */
+  /* vanilla widgets button law: grey 3-band body + dark outline + top highlight;
+     the CURRENT state rides on the label colour (green=存 / blue=取), like the
+     game's on-chip (选中绿系) — the BLOCK itself stays vanilla grey */
+  .dir { margin:15px 18px 0; height:87px; border:3px solid #030303; cursor:pointer;
+         display:flex; align-items:center; justify-content:center; gap:21px;
+         font-family:inherit; user-select:none;
+         background:linear-gradient(#6b6b6b,#707070 40%,#565656);
+         box-shadow:inset 0 3px 0 #aaaaaa; }
+  .dir:hover { background:linear-gradient(#a6a6a6,#999999 40%,#7d7d7d); }
+  .dir .lab { font-size:27px; color:#e0e0e0; }
+  .dir .arrow { font-size:24px; color:#c0c0c0; }
+  .dir.store .lab  { color:#7fff7f; }   /* vanilla-green state text */
+  .dir.take  .lab  { color:#7fc8ff; }   /* blue state text */
+
+  /* rate segmented bar */
+  .rate { display:flex; align-items:center; gap:9px; padding:12px 18px 0; }
+  .rate .rl { font-size:24px; }
+  .seg { flex:1; height:36px; display:flex; }
+  .seg span { flex:1; display:flex; align-items:center; justify-content:center;
+              font-size:21px; color:#e0e0e0; cursor:pointer; user-select:none;
+              background:linear-gradient(#6b6b6b,#707070 40%,#565656);
+              border:3px solid #030303; }
+  .seg span.on { background:linear-gradient(#6f9e6f,#5a7d5a 40%,#3f5c3f);
+                 box-shadow:inset 0 3px 0 #a8d0a8; color:#fff; }
+
+  .foot { position:absolute; left:18px; right:18px; bottom:15px;
+          display:flex; align-items:center; gap:12px; }
+  .unbind { font-family:inherit; font-size:24px; color:#ff5555; padding:0 15px; height:36px;
+            background:linear-gradient(#6b6b6b,#707070 40%,#565656);
+            box-shadow:inset 0 3px 0 #aaaaaa;
+            border:3px solid #030303; cursor:pointer;
+            display:flex; align-items:center; }
+  .unbind:hover { background:linear-gradient(#a6a6a6,#999999 40%,#7d7d7d); color:#ffffa0; }
+  .hint { font-size:21px; color:#707070; }
+
+  .cap { color:#888; font-size:12px; margin-top:12px; text-align:center; max-width:560px; }
+</style>
+</head>
+<body>
+<h1>轮椅Mod · 机器配置 · 原型 v2 · 1 GUI px = 3 CSS px</h1>
+<div class="sub">Mekanism 色块语言 · 独立小窗 176×110 GUI · Shift+右键已标记机器打开</div>
+
+<div class="win">
+  <div class="head">
+    <div class="nm">火力发电机</div>
+    <div class="loc">主世界 (128,64,-35)</div>
+  </div>
+
+  <div class="dir store" id="dirBtn" title="点击切换: 存 ⇄ 取"
+       onclick="var d=this;d.classList.toggle('store');d.classList.toggle('take');
+                var s=d.classList.contains('store');
+                d.querySelector('.lab').textContent=s?'存':'取';
+                d.querySelector('.arrow').textContent=s?'机器 → 存储池':'存储池 → 机器';">
+    <div class="lab">存</div>
+    <div class="arrow">机器 → 存储池</div>
+  </div>
+
+  <div class="rate">
+    <div class="rl">速率</div>
+    <div class="seg">
+      <span class="on">自适应</span><span>2048</span><span>512</span><span>32</span>
+    </div>
+  </div>
+
+  <div class="foot">
+    <button class="unbind">解除标记</button>
+    <span class="hint">机器被拆自动解除</span>
+  </div>
+</div>
+<div class="cap">点色块切换方向（白框=当前）· 速率默认自适应=按机器实际接受量爬坡不炸机 · 色块语义参考 Mekanism 侧配置（输入蓝/输出橙 → 我们绿=入库 蓝=出库）</div>
+</body>
+</html>

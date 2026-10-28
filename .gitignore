@@ -1,0 +1,19 @@
+# gradle
+.gradle/
+build/
+
+# game run dir (runDir = "eclipse" in build.gradle)
+eclipse/
+
+# logs & test artifacts
+logs/
+*.log
+screenshots/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.classpath
+.project

@@ -1,0 +1,6 @@
+key.categories.wheelchair=轮椅Mod
+key.wheelchair.terminal=打开存储终端
+item.wheelchair.staff.name=轮椅手杖
+tile.wheelchair.generator.name=测试发电机
+tile.wheelchair.sink.name=能量垃圾桶
+tile.wheelchair.battery.name=电池方块

@@ -1,0 +1,16 @@
+[
+{
+  "modid": "wheelchair",
+  "name": "轮椅Mod",
+  "description": "轮椅Mod 重启骨架",
+  "version": "${version}",
+  "mcversion": "${mcversion}",
+  "url": "",
+  "updateUrl": "",
+  "authorList": ["wheelchair"],
+  "credits": "",
+  "logoFile": "",
+  "screenshots": [],
+  "dependencies": []
+}
+]

@@ -1,0 +1,16 @@
+{
+  "required": true,
+  "minVersion": "0.4.10",
+  "package": "wheelchair.mixin",
+  "plugin": "wheelchair.mixin.WheelchairMixinPlugin",
+  "refmap": "mixins.wheelchair.refmap.json",
+  "target": "1.7.10",
+  "compatibilityLevel": "JAVA_8",
+  "mixins": [
+    "MixinPacketBuffer",
+    "MixinItemStack",
+    "MixinInventoryPlayer",
+    "MixinInventoryBasic",
+    "MixinNetHandlerPlayServer"
+  ]
+}

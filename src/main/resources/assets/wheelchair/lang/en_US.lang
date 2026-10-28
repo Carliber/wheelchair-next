@@ -1,0 +1,6 @@
+key.categories.wheelchair=Wheelchair Mod
+key.wheelchair.terminal=Open storage terminal
+item.wheelchair.staff.name=Wheelchair Staff
+tile.wheelchair.generator.name=Test Generator
+tile.wheelchair.sink.name=Energy Trash
+tile.wheelchair.battery.name=Battery Block

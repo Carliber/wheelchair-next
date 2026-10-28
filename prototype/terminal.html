@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>轮椅Mod 终端 · 原型 v26 · 游戏内 100% 复刻版</title>
+<style>
+  /* ============================================================
+     尺寸体系: 1 MC GUI px = 3 CSS px (1.7.10 源码实证, 见 skills/mc1710)
+     面板 197 (AE2 终端宽 x_width=197) / 竖条 28 / 槽 18 / 字高 8 / 槽边距 9
+     滚动条 12 宽 15 滑块高 (vanilla creative tabs.png 规格)
+     所有数值 = GUI px × 3, 游戏内逐像素可复刻
+     ============================================================ */
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#2c2c2c; font-family:"Courier New",monospace; color:#e0e0e0;
+         display:flex; flex-direction:column; align-items:center; padding:18px; }
+  h1 { font-size:15px; color:#9fd49f; margin-bottom:3px; }
+  .sub { font-size:12px; color:#888; margin-bottom:12px; }
+
+  /* ===== window = rail(28) + panel(197) = 225 GUI = 675 CSS ===== */
+  .win { display:flex; background:#c6c6c6; border:9px solid;
+         border-color:#ffffff #555555 #555555 #ffffff; width:642px; color:#404040; }
+  .win .body { flex:1; display:flex; min-height:0; }
+
+  /* ===== left text rail: 28 wide, buttons 26x18 pitch 20 (game TerminalRail) ===== */
+  .rail { display:flex; flex-direction:column; align-items:flex-end; gap:6px; padding:9px 3px; }
+  .rtab { width:78px; height:45px; display:flex; align-items:center; justify-content:center;
+          font-size:24px; line-height:1; cursor:pointer; user-select:none; position:relative;
+          background:linear-gradient(#6b6b6b,#707070 40%,#565656);
+          border:3px solid #030303; box-shadow:inset 0 3px 0 #aaaaaa; }
+  .rtab.on .rlabel { color:#eaffea; }
+  .rtab:hover { background:linear-gradient(#a6a6a6,#999999 40%,#7d7d7d); }
+  .rtab:hover .rlabel { color:#ffffa0; }
+  .rtab.on { background:linear-gradient(#6f9e6f,#5a7d5a 40%,#3f5c3f);
+             box-shadow:inset 0 3px 0 #a8d0a8; }
+  .rtab .lbl2 { position:absolute; left:84px; top:6px; background:#100010e0; color:#fff;
+                font-size:21px; padding:9px 18px; white-space:nowrap; display:none; z-index:30;
+                border:3px solid #6a4a8a; }
+  .rtab:hover .lbl2 { display:block; }
+  .rail .spring { flex:1; }
+
+  /* ===== screen = the 197-wide panel ===== */
+  .screen { background:#c6c6c6; border-left:12px solid #999; padding:0;
+            flex:1; min-height:0; display:flex; flex-direction:column; overflow:hidden; }
+  .screen > * { width:100%; }
+  .screen #page { flex:1; min-height:0; display:flex; flex-direction:column; position:relative; }
+
+  /* header strip 1: search fills (compressed: 36 CSS = 12 GUI, fits the 8px font) */
+  .toolbar { display:flex; gap:9px; padding:9px 66px 6px 27px; }
+  /* GuiTextField: black body + 1px grey frame (white when focused), no placeholder */
+  .search { flex:1; background:#000; border:3px solid #a0a0a0; color:#e0e0e0; font-family:inherit;
+            font-size:24px; padding:0 9px; outline:none; height:36px; }
+  .search:focus { border-color:#fff; }
+  /* buttons follow the vanilla widgets.png structure (pixel-sampled):
+     1px #030303 outline + 1px #aaaaaa top highlight + grey vertical gradient
+     #6b6b6b->#707070->#565656; hover = blue-violet gradient + yellow text
+     (#bec7ff->#808ac1->#5c669d, text FFFFA0); text E0E0E0 with 1px shadow */
+  .vbtn { display:flex; align-items:center; justify-content:center; gap:6px;
+          background:linear-gradient(#6b6b6b,#707070 40%,#565656);
+          border:3px solid #030303; box-shadow:inset 0 3px 0 #aaaaaa;
+          color:#e0e0e0; font-family:inherit;
+          font-size:21px; padding:0 18px; cursor:pointer; user-select:none; height:36px; }
+  .vbtn:hover { background:linear-gradient(#a6a6a6,#999999 40%,#7d7d7d); color:#ffffa0; }
+  .vbtn span { flex:none; }
+  .vbtn .arw { color:inherit; font-size:18px; }
+
+  /* header strip 2: category chips (game ChipButton w32 h13 pitch 34) */
+  .cats { display:flex; align-items:center; gap:6px; padding:0 66px 6px 27px;
+          border-bottom:6px solid #999; flex-wrap:wrap; }
+  .cat { font-size:24px; color:#e0e0e0;
+         background:linear-gradient(#6b6b6b,#707070 40%,#565656);
+         border:3px solid #030303; box-shadow:inset 0 3px 0 #aaaaaa;
+         padding:0 9px; height:36px;
+         display:flex; align-items:center; justify-content:center; cursor:pointer; user-select:none; }
+  .cat:hover { background:linear-gradient(#a6a6a6,#999999 40%,#7d7d7d); color:#ffffa0; }
+  .cat.on { color:#ffffff; background:linear-gradient(#6f9e6f,#5a7d5a 40%,#3f5c3f);
+            box-shadow:inset 0 3px 0 #a8d0a8; }
+  .cat.add { background:linear-gradient(#8a8a8a,#909090 40%,#767676); }
+
+  /* slot cells: 18x18 pitch-0 (vanilla well, bed extends AROUND the 16x16
+     item anchor — matches the game's slotRect outward bevel, no gaps) */
+  .gridwrap { display:flex; gap:42px; padding:9px 0 0 27px; }
+  .grid { display:grid; grid-template-columns:repeat(9,54px); gap:0; }
+  .gcell { width:54px; height:54px; background:#8b8b8b; border-top:3px solid #373737;
+           border-left:3px solid #373737; border-right:3px solid #ffffff;
+           border-bottom:3px solid #ffffff; }
+  /* scrollbar: w12 knob h15 -> 36/45 (vanilla creative tabs spec) */
+  .vbar { width:24px; background:#8b8b8b; border:6px solid;
+          border-color:#373737 #ffffff #ffffff #373737; position:relative; }
+  /* knob: top:0 = scroll 0 (game ky = trackY + (track-24)*scroll/max, track=sbH-4) */
+  .vbar .k { position:absolute; left:0; top:0; width:12px; height:72px; background:#c6c6c6; border:3px solid; border-color:#ffffff #555555 #555555 #ffffff; }
+
+  /* inventory block: 99 GUI high = 297 CSS (3 rows + hotbar, 4 rows of 18) */
+  .invwrap { margin-top:auto; padding:9px 66px 9px 27px; border-top:6px solid #999; }
+  .seclbl { font-size:24px; line-height:1; color:#404040; margin-bottom:3px; }
+  .inv { display:grid; grid-template-columns:repeat(9,54px); gap:0; }
+  .hot { margin-top:12px; } /* vanilla 4px gap (ContainerPlayer: rows end 138, hotbar 142) */
+
+  /* func band area (crafting band = 73 GUI reserved = 219 CSS) */
+  .band { padding:6px 66px 0 27px; position:relative; }
+  .bandmid { position:absolute; left:231px; top:372px; }  /* arrow centre = grid col 5 (88 GUI) */
+  .bandmid .harrow { margin:0; }
+  .grid3 { display:grid; grid-template-columns:repeat(3,54px); gap:0; }
+  .bleft { flex:1; display:flex; justify-content:flex-end; align-items:center; padding-right:63px; }
+  .bright { flex:1; display:flex; justify-content:flex-start; align-items:center; padding-left:63px; }
+  .frow { display:flex; align-items:center; gap:27px; justify-content:center; padding:6px 0; }
+  .bigslot { width:54px; height:54px; background:#8b8b8b; border-top:3px solid #373737;
+             border-left:3px solid #373737; border-right:3px solid #ffffff;
+             border-bottom:3px solid #ffffff; }
+  .result { width:54px; height:54px; }
+  /* vanilla arrow: GuiFurnace draws 24x16 GUI px (u176 v14) = 72x48 CSS */
+  .harrow { width:72px; height:48px; position:relative; margin:0 18px; flex:none; }
+  .harrow .g { position:absolute; inset:0;
+    background:#8b8b8b;
+    -webkit-clip-path:polygon(0 35%,45% 35%,45% 10%,100% 50%,45% 90%,45% 65%,0 65%);
+    clip-path:polygon(0 35%,45% 35%,45% 10%,100% 50%,45% 90%,45% 65%,0 65%); }
+  .note { font-size:24px; color:#404040; text-align:center; margin:6px 0 18px 0; padding:0 27px; box-sizing:border-box; }
+
+  /* chips row (storage band switch: game BandChip 40x13) */
+  .chipline { display:flex; gap:12px; justify-content:center; padding:6px 0 0 0; flex-wrap:wrap; }
+  .chip { font-size:24px; color:#e0e0e0;
+          background:linear-gradient(#6b6b6b,#707070 40%,#565656);
+          border:3px solid #030303; box-shadow:inset 0 3px 0 #aaaaaa;
+          padding:0 9px; height:36px;
+          display:flex; align-items:center; justify-content:center; cursor:pointer; user-select:none; }
+  .chip:hover { background:linear-gradient(#a6a6a6,#999999 40%,#7d7d7d); color:#ffffa0; }
+  .chip.on { color:#fff; background:linear-gradient(#6f9e6f,#5a7d5a 40%,#3f5c3f);
+             box-shadow:inset 0 3px 0 #a8d0a8; }
+
+  /* level system: section title + rule, NO box border (user: 分层级不是框起来) */
+  .autobox { margin:0 0 12px 0; border:none; padding:0; }
+  /* section title: BIGGER and darker than body text (27px vs 24px) — no bold in MC */
+  .autobox .t { font-size:27px; color:#303030; margin:0; padding:3px 6px;
+                border-bottom:3px solid #b0b0b0; }
+  /* divider BETWEEN sections (2-GUI grey rule, same law as the page rules) */
+  .escroll .autobox + .autobox { border-top:6px solid #999; padding-top:12px; margin-top:6px; }
+  .autobox .note-in { font-size:21px; color:#707070; margin:0; padding:3px 6px; }
+  .autobox .r { display:flex; align-items:center; gap:12px; margin:0; padding:3px 6px; font-size:24px; color:#404040; flex-wrap:wrap; }
+  .autobox .r:last-child { margin-bottom:0; }
+  .escroll .autobox { padding:0; }
+  /* small inline checkbox (title-bar size, 6x6 GUI) — smaller than .cchk */
+  .tchk { width:18px; height:18px; background:#000; border:3px solid #a0a0a0; flex:none;
+          display:inline-flex; align-items:center; justify-content:center; color:#7fff7f;
+          font-size:15px; cursor:pointer; user-select:none; }
+  /* a scrollpane nested inside a block must not re-indent (double-padding bug) */
+  .autobox .scrollpane { padding:0; }
+  .autobox input[type=text] { flex:1; background:#000; border:3px solid #a0a0a0; color:#e0e0e0;
+                              font-family:inherit; font-size:24px; padding:3px 12px; outline:none; height:48px; }
+  .autobox input[type=text].narrow { flex:none; width:144px; text-align:center; }
+  .chk { width:24px; height:24px; background:#000; border:3px solid #a0a0a0; flex:none;
+         display:inline-flex; align-items:center; justify-content:center; color:#7fff7f;
+         font-size:18px; cursor:pointer; user-select:none; }
+  /* small inline checkbox: 8x8 GUI, black body + 1px grey frame (text-field law;
+     vanilla has no native checkbox — this is the closest idiom). Green ✔ when on */
+  .cchk { width:24px; height:24px; background:#000; border:3px solid #a0a0a0; flex:none;
+          display:inline-flex; align-items:center; justify-content:center; color:#7fff7f;
+          font-size:18px; cursor:pointer; user-select:none; }
+  .chiprow { display:flex; gap:9px; flex-wrap:wrap; }
+  .scell { width:54px; height:54px; background:#8b8b8b; border:3px solid;
+           border-color:#373737 #ffffff #ffffff #373737; }
+  .fl-lbl { font-size:24px; color:#404040; margin:0; padding:3px 6px; }
+  .row9 { display:grid; grid-template-columns:repeat(9,54px); gap:0; margin:0; padding:0 6px; max-width:540px; }
+
+  /* progress bar: vanilla furnace style */
+  .prog { width:54px; height:30px; background:#4a4a4a; border:3px solid;
+          border-color:#373737 #ffffff #ffffff #373737; position:relative; overflow:hidden; }
+  .prog .fill { position:absolute; left:0; top:0; bottom:0; background:#7fd47f; }
+
+  /* energy rows / mob grid */
+  .mrow { display:flex; align-items:center; gap:9px; min-height:63px; background:rgba(0,0,0,.14);
+          border:3px solid #9a9a9a; padding:6px 12px; margin-bottom:6px; font-size:24px;
+          flex-wrap:wrap; }
+  .mrow:last-child { margin-bottom:0; }
+  .mrow .enm { flex:1; color:#404040; white-space:nowrap; overflow:hidden; }
+
+  /* scrollable info pages: SELF-DRAWN scrollbar pane (same .vbar widget as the
+     storage grid - the game draws its scrollbar the same way, no browser chrome) */
+  .scrollpane { flex:1; min-height:0; display:flex; gap:12px; padding:0 30px 0 27px; }
+  .escroll { flex:1; min-height:0; overflow:hidden; }
+  /* 量高时限住滚动区,不让内容页把窗口撑爆 (游戏内同理: 窗口≤画布高,超出滚动) */
+  .win.measure .scrollpane { flex:none; }
+  .win.measure .escroll { max-height:360px; }
+
+  /* enchant rows: 21 GUI high = 63 CSS, book icon 16 = 48.
+     Row structure KEPT (base tint + border + state tints); colours swapped
+     for vanilla values: base = translucent-black overlay (AE2 断电遮罩 pattern),
+     have = GOLD 0xFFAA00 @25%, excl = RED 0xFF5555 @28% (chat '6'/'c'),
+     hover ADDS 50% white on top (0x80FFFFFF slot highlight, inset overlay
+     so the state tint underneath stays visible) */
+  .erow { display:flex; align-items:center; gap:12px; height:63px; background:rgba(0,0,0,.14);
+          border:3px solid #9a9a9a; padding:0 9px; margin-bottom:6px; }
+  .erow:hover { box-shadow:inset 0 0 0 9999px rgba(255,255,255,.5); }
+  .erow.excl { background:rgba(255,85,85,.28); }
+  .erow.have { background:rgba(255,170,0,.25); }
+  .eicon { width:48px; height:48px; display:flex; align-items:center; justify-content:center;
+           font-size:30px; flex:none; }
+  .enm { flex:1; font-size:24px; color:#fff; white-space:nowrap; overflow:hidden; }
+  .enm .arrow { color:#ffff55; }   /* vanilla YELLOW 0xFFFF55 (chat 'e') */
+  .enm .etag { color:#ff5555; font-size:18px; margin-left:9px; } /* vanilla RED 0xFF5555 (chat 'c') */
+  .eprice { font-size:24px; color:#404040; white-space:nowrap; } /* vanilla label grey on #c6c6c6 */
+  /* level number box: black bed + yellow digits (game lvlbox, no +/- steppers) */
+  .lvlbox { width:84px; height:48px; background:#000; border:3px solid #a0a0a0; color:#ffff55;
+            font-family:inherit; font-size:24px; text-align:center; outline:none; flex:none; }
+  .lvlbox.pending { border-color:#ffff55; }
+  /* vanilla widgets.png button — same law as .vbtn, normal size: h12 GUI
+     (36css) like every other button on the page (game SORT_H/CHIP_H=12) */
+  .abtn { display:flex; align-items:center; justify-content:center;
+          background:linear-gradient(#6b6b6b,#707070 40%,#565656);
+          border:3px solid #030303; box-shadow:inset 0 3px 0 #aaaaaa;
+          color:#e0e0e0; font-family:inherit;
+          font-size:24px; padding:0 18px; cursor:pointer; user-select:none; height:36px; }
+  .abtn:hover { background:linear-gradient(#a6a6a6,#999999 40%,#7d7d7d); color:#ffffa0; }
+  .abtn[disabled] { background:linear-gradient(#4a4a4a,#4f4f4f 40%,#3f3f3f);
+                    box-shadow:inset 0 3px 0 #6a6a6a; color:#a0a0a0; cursor:default; }
+  .apply { display:flex; gap:9px; flex-wrap:nowrap; }
+  .stage { font-size:21px; color:#404040; align-self:center; }
+
+  /* mob grid cells */
+  .mobgrid { display:flex; flex-wrap:wrap; gap:0; padding:0; }
+  /* furnace cache: same fixed 9-col grid as the storage panel */
+  .cachegrid { display:grid; grid-template-columns:repeat(9,54px); gap:0; }
+  .mcell { width:54px; height:54px; background:#8b8b8b; border:3px solid;
+           border-color:#373737 #ffffff #ffffff #373737; position:relative; }
+  .mcell .nm { font-size:15px; color:#fff; position:absolute;
+               left:3px; top:3px; }
+  .mcell .ct { position:absolute; right:3px; bottom:0; font-size:15px; color:#fff;
+               }
+  .mcell .nbt { position:absolute; right:3px; top:3px; width:9px; height:9px;
+                background:#ffff55; border:2px solid #555; }
+
+  /* hint: one-line visible, long text on hover (vanilla tooltip colours) */
+  .slider { flex:1; height:24px; }
+  .radio { display:inline-flex; align-items:center; gap:6px; font-size:24px; color:#404040;
+            padding:3px 9px; cursor:pointer; }
+  .radio .dot { width:18px; height:18px; border:3px solid #6a6a6a; background:#c6c6c6; flex:none; }
+  .radio.on .dot { background:#5a7d5a; border-color:#2e4a2e; }
+  /* xp counter top-right (the freed sort-button spot X175..211):
+     anvil cost law (GuiRepair) — green 0x80FF20, red 0xFF6060 when short.
+     NO text-shadow: the vanilla shadow pass (colour>>2) reads as a ghost on
+     thin browser fonts, and MC never draws this pair on a light panel anyway */
+  .xptag { position:absolute; right:15px; top:9px; height:36px; display:flex; align-items:center;
+           font-size:24px; color:#80ff20; }
+  .xptag.short { color:#ff6060; }
+  .hint { color:#2b4b8b; border-bottom:2px solid #2b4b8b; cursor:help; position:relative; }
+  .hint:hover::after { content:attr(data-tip); position:absolute; left:0; top:100%; z-index:40;
+    background:#100010e0; color:#fff; border:3px solid #6a4a8a; font-size:21px; font-weight:normal;
+    padding:9px 15px; white-space:pre-wrap; width:420px; text-align:left; }
+  .xptag.hint { border-bottom:none; position:absolute; } /* must beat .hint{position:relative} */
+  .abtn.hint { border-bottom:3px solid #030303; } /* keep the vanilla outline; hint only adds the tooltip */
+
+  .cap { color:#888; font-size:12px; margin-top:12px; text-align:center; max-width:700px; }
+</style>
+</head>
+<body>
+<h1>轮椅Mod 终端 · 原型 v26 · 1 GUI px = 3 CSS px（游戏内逐像素复刻）</h1>
+<div class="sub">窗口 214 = 边3+竖条28+分隔4+面板176+边3（面板=vanilla 容器宽 8+160+8，网格左右各 8，滚动条 168..176 贴右缘）· 槽 16+2 · 字高 8 · 滚动条宽 8 KNOB 4×24——所有值 = MC GUI 坐标 × 3</div>
+
+<div class="win">
+  <div class="body">
+    <div class="rail" id="rail"></div>
+    <div class="screen">
+      <div id="page"></div>
+    </div>
+  </div>
+</div>
+<div class="cap">左条(文字)：存储(+合成/拆解切换) / 附魔 / 能源 / 生物 …底部钉住：手杖、设置 · 每页底部=3行背包+1行快捷栏（手杖/设置页除外） · 中文字宽游戏内以 getStringWidth 实测为准，超宽按 Mekanism renderScaledText 缩放</div>
+
+<script>
+var TABS=[
+  {id:'storage',txt:'存储',n:'存储+合成/拆解切换'},
+  {id:'ench',txt:'附魔',n:'附魔库'},
+  {id:'energy',txt:'能源',n:'能源管理 (RF)'},
+  {id:'mobs',txt:'生物',n:'生物库'},
+];
+var PINNED=[
+  {id:'staff',txt:'手杖',n:'手杖: 加速/通电/捕捉/连锁/整地'},
+  {id:'settings',txt:'设置',n:'设置: 视图/旅途/自动'},
+];
+var cur='storage', sortIdx=0, sorts=['名称','数量','类型','创造'], asc=true;
+var GCOLS=9, GROWS=3; // storage grid: 9 cols fixed (game COLS=9), rows = rowsMode tier
+
+function renderRail(){
+  var r=document.getElementById('rail'); r.innerHTML='';
+  TABS.forEach(function(t){
+    var d=document.createElement('div');
+    d.className='rtab'+(cur===t.id?' on':'');
+    d.innerHTML='<span class="rlabel">'+t.txt+'</span><span class="lbl2">'+t.n+' · 左键打开</span>';
+    d.onclick=function(){ cur=t.id; render(); };
+    r.appendChild(d);
+  });
+  var sp=document.createElement('div'); sp.className='spring'; r.appendChild(sp);
+  var pw=document.createElement('div'); // game pinned: ySize-46 + i*22 → pitch 22 (gap 4px)
+  pw.style.cssText='display:flex;flex-direction:column;gap:4px;align-items:flex-end';
+  PINNED.forEach(function(t){
+    var s=document.createElement('div');
+    s.className='rtab'+(cur===t.id?' on':'');
+    s.innerHTML='<span class="rlabel">'+t.txt+'</span><span class="lbl2">'+t.n+'</span>';
+    s.onclick=function(){ cur=t.id; render(); };
+    pw.appendChild(s);
+  });
+  r.appendChild(pw);
+}
+
+function slots(n){ var a=[]; for(var i=0;i<n;i++) a.push('<div class="gcell"></div>'); return a.join(''); }
+
+var bandMode=0; // 0=合成 1=拆解
+var typeSel=0, typeNames=['全部','物品','其他'];
+var nbtSel=0, nbtNames=['全部','无NBT','有NBT'];
+var recIdx=0, deconN=6; // variant count shown ONLY in decon mode when >1 (game FG layer); craft has none
+function pgStorage(){
+  // absolute layout: css/3 = panel-content GUI px, window = +(35,3) — 1:1 with GuiStoragePage; content 546x750 (182x250 GUI)
+  var S='<div style="position:relative;width:528px;height:750px">';
+  // header strip 1 (window coords = game constants): search X45 Y6 W129 H12,
+  // sort mode X175 W24 + sort dir X199 W12 (two buttons; SORTS has 4 modes incl 创造)
+  S+='<input class="search" style="position:absolute;left:24px;top:9px;width:387px;height:36px">';
+  S+='<div class="vbtn" id="sortBtn" style="position:absolute;left:420px;top:9px;width:72px;height:36px;padding:0"><span>'+sorts[sortIdx]+'</span></div>';
+  S+='<div class="vbtn" id="sortDir" style="position:absolute;left:492px;top:9px;width:36px;height:36px;padding:0"><span>'+(asc?'▲':'▼')+'</span></div>';
+  // header strip 2: two cycling filter labels y17 h12 — type(x10 w45) & nbt(x58 w60), rule y31
+  S+='<div class="cat" style="position:absolute;left:24px;top:51px;width:135px;height:36px;white-space:nowrap" onclick="typeSel=(typeSel+1)%3;render()">类型:'+typeNames[typeSel]+'</div>';
+  S+='<div class="cat" style="position:absolute;left:168px;top:51px;width:180px;height:36px;white-space:nowrap" onclick="nbtSel=(nbtSel+1)%3;render()">NBT:'+nbtNames[nbtSel]+'</div>';
+  S+='<div style="position:absolute;left:24px;top:93px;width:480px;height:6px;background:#999"></div>';
+  // storage grid & inventory: x15..177 centred (193-162=31 odd -> left 15 / right 16)
+  // scrollbar: 12 wide (vanilla spec), knob 24 high, flush against the right frame x181..193
+  S+='<div class="grid" style="position:absolute;left:24px;top:108px">'+slots(27)+'</div>';
+  S+='<div class="vbar" style="position:absolute;left:504px;top:108px;height:156px"><div class="k"></div></div>';  // = grid height (rows-1)*18+16 = 52 GUI, NOT rows*18
+  // band switch chips: 24 wide each, centred on grid centre x90 (GUI)
+  S+='<div class="chip'+(bandMode===0?' on':'')+'" style="position:absolute;left:189px;top:270px;width:72px;height:36px;white-space:nowrap" onclick="bandMode=0;recIdx=0;render()">合成</div>';
+  S+='<div class="chip'+(bandMode===1?' on':'')+'" style="position:absolute;left:273px;top:270px;width:72px;height:36px;white-space:nowrap" onclick="bandMode=1;recIdx=0;render()">拆解</div>';
+  // band: arrow at col5 centre (x91); matrix/output centred on the LEFT four cols (x46) and RIGHT four cols (x136)
+  S+='<div class="bandmid"><div class="harrow"><div class="g"></div></div></div>';
+  // recipe switch: both small < > buttons sit LEFT of the 3x3 (above the arrow, flush with the band top), same coords in both modes
+  S+='<div class="chip" style="position:absolute;left:231px;top:318px;width:36px;height:30px;padding:0" onclick="recIdx=Math.max(0,recIdx-1);render()">&lt;</div>';
+  S+='<div style="position:absolute;left:267px;top:318px;width:36px;height:30px;padding:0" class="chip" onclick="recIdx=Math.min((bandMode===1?deconN:1)-1,recIdx+1);render()">&gt;</div>';
+  // recipe counter: decon only, n>1, drawCenteredString x126 y matY+11 (window) — the 8px gap above the arrow
+  if(bandMode===1&&deconN>1) S+='<div style="position:absolute;left:243px;top:351px;width:48px;text-align:center;font-size:24px;color:#404040">'+(recIdx+1)+'/'+deconN+'</div>';
+  if(bandMode===0){
+    S+='<div class="grid3" style="position:absolute;left:51px;top:318px">'+slots(9)+'</div>';  // MAT_X=54, matY=111
+    S+='<div class="gcell" style="position:absolute;left:348px;top:372px"></div>';             // RESULT_X=153, arrowY=129
+  }else{
+    S+='<div class="bigslot" style="position:absolute;left:105px;top:372px"></div>';         // input centre x54 (col3)
+    S+='<div class="grid3" style="position:absolute;left:321px;top:318px">'+slots(9)+'</div>'; // output centre x126 (col7)
+  }
+  // inventory: rule y164 | 3 rows x15 y169 | hotbar y229 (GUI, aligned with the grid)
+  S+='<div style="position:absolute;left:24px;top:492px;width:480px;height:6px;background:#999"></div>';
+  S+='<div class="inv" style="position:absolute;left:24px;top:507px">'+slots(27)+'</div>';
+  S+='<div class="inv" style="position:absolute;left:24px;top:687px">'+slots(9)+'</div>';
+  return S+'</div>';
+}
+var enchDemo=[ {n:'锋利',lvl:3,st:5,price:40,have:1},
+               {n:'亡灵杀手',lvl:0,st:null,price:22,excl:1},
+               {n:'耐久',lvl:3,st:null,price:0,have:1},
+               {n:'抢夺',lvl:0,st:2,price:40},
+               {n:'效率',lvl:5,st:null,price:0,have:1},
+               {n:'精准采集',lvl:0,st:1,price:30,excl:1},
+               {n:'保护',lvl:4,st:null,price:0,have:1},
+               {n:'火焰附加',lvl:2,st:2,price:26},
+               {n:'击退',lvl:2,st:null,price:0,have:1},
+               {n:'荆棘',lvl:1,st:1,price:18},
+               {n:'水下速掘',lvl:1,st:null,price:0,have:1},
+               {n:'节肢杀手',lvl:0,st:null,price:20,excl:1},
+               {n:'横扫之刃',lvl:3,st:3,price:35} ];
+function pgEnch(){
+  // absolute layout, same method as pgStorage: css/3 = panel-content GUI px,
+  // window coords = +(35,3) — spec for the future GuiEnchPage (not yet built)
+  var S='<div style="position:relative;width:528px;height:750px">';
+  // header: search X45 Y6 W129 H12 (same as storage; GuiTextField 1px frame, no placeholder)
+  S+='<input class="search" style="position:absolute;left:24px;top:9px;width:387px;height:36px">';
+  // xp counter top-right X175..211 (the freed sort-button spot), anvil cost law,
+  // right-aligned to the panel frame — value = stored xp (demo 9900)
+  S+='<div class="xptag hint" data-tip="存储经验点数\n待应用消耗超出时变红">9900点</div>';
+  // item to enchant at panel x8 Y20 + cost as a BARE NUMBER beside it;
+  // right side of the same row: the uncapped checkbox, flush to x168 (8-GUI margin)
+  S+='<div class="gcell" style="position:absolute;left:24px;top:51px">🗡</div>';
+  S+='<div style="position:absolute;left:78px;top:63px;font-size:24px;color:#404040">80</div>';
+  S+='<div style="position:absolute;right:24px;top:51px;display:flex;align-items:center;gap:9px;font-size:24px;color:#404040"><span class="cchk"></span>突破上限</div>';
+  // enchant list Y39..139: SAME geometry law as the storage grid — rows span
+  // 160 GUI (8*18+16) at x8..168 (8-GUI side margins, like vanilla), exactly
+  // the inventory/grid width; the scrollbar sits SEPARATELY in the right
+  // gutter x168..176 flush to the frame and takes NO part in the list layout
+  S+='<div class="escroll" id="elist" style="position:absolute;left:24px;top:108px;width:480px;height:300px">';
+  enchDemo.forEach(function(e){
+    var pend=(e.st!==null&&e.st!==undefined&&e.st!==e.lvl);
+    var shown=(e.st!==null&&e.st!==undefined)?e.st:e.lvl;
+    S+='<div class="erow'+(e.excl?' excl':'')+(e.have&&!e.excl?' have':'')+'">'+
+      '<div class="eicon">📖</div><div class="enm">'+e.n+(pend?' <span class="arrow">→'+e.st+'</span>':'')+
+      (e.excl?'<span class="etag">互斥</span>':'')+'</div>'+ // etag: 0.75-scaled red (variant-badge precedent)
+      '<div class="eprice">经验'+e.price+'点</div>'+
+      '<input class="lvlbox'+(pend?' pending':'')+'" value="'+shown+'"></div>';
+  });
+  // knob travel 68 GUI (track 92 = 100-2*2bevel, minus KNOB 24) = 204css, fixed h 24 GUI like the game
+  S+='</div><div class="vbar" id="ebar" style="position:absolute;left:504px;top:108px;height:300px"><div class="k"></div></div>';
+  // apply row Y140 H12: [应用 | 15级 1234点经验] left group, [存][取] right group
+  // flush to x168; click = ONE LEVEL, shift = ALL (tooltips state it)
+  S+='<div class="apply" style="position:absolute;left:24px;top:420px;width:480px;padding:0;flex-wrap:nowrap;justify-content:space-between">'+
+     '<div style="display:flex;gap:9px;align-items:center"><button class="abtn" id="ap">应用</button>'+
+     '<div style="font-size:24px;color:#404040">15级 1234点经验</div></div>'+
+     '<div style="display:flex;gap:9px">'+
+     '<button class="abtn hint" data-tip="存经验: 点击存1级\n按住Shift:存全部">存</button>'+
+     '<button class="abtn hint" data-tip="取经验: 点击取1级\n按住Shift:取全部">取</button></div></div>';
+  // inventory: rule Y167 | 3 rows Y172 | hotbar Y232 (identical to storage)
+  S+='<div style="position:absolute;left:24px;top:492px;width:480px;height:6px;background:#999"></div>';
+  S+='<div class="inv" style="position:absolute;left:24px;top:507px">'+slots(27)+'</div>';
+  S+='<div class="inv" style="position:absolute;left:24px;top:687px">'+slots(9)+'</div>';
+  return S+'</div>';
+}
+function setbox(title,rows){ return '<div class="autobox"><div class="t">'+title+'</div>'+rows+'</div>'; }
+function toggle(on){ return '<span class="chk" data-on="'+(on?1:0)+'">'+(on?'✔':'')+'</span>'; }
+function chips(cur,arr){ var h='<span class="chiprow">'; arr.forEach(function(c,i){
+    h+='<span class="chip'+(i===cur?' on':'')+'" data-i="'+i+'">'+c+'</span>'; }); return h+'</span>'; }
+
+var magCfg={on:1,range:2,items:1,xp:1,mode:0,filter:''}; // range idx: 2/3/5/7/10
+var feedCfg={on:1,hunger:14,skipBad:1};
+var restCfg={on:1,keep:'一组'};
+function autoCard(title,on,summary){
+  return '<div class="autocard" style="flex:1;background:'+(on?'#5a7d5a':'#a8a8a8')+
+    ';border:6px solid;border-color:#d8d8d8 #6a6a6a #6a6a6a #d8d8d8;padding:9px 12px;margin-bottom:12px">'+
+    '<div style="display:flex;justify-content:space-between;align-items:center;font-size:24px;color:'+(on?'#eaffea':'#3a3a3a')+'">'+
+    '<span>'+title+'</span>'+toggle(on)+'</div>'+
+    '<div style="font-size:21px;color:'+(on?'#d8ffd8':'#3a3a3a')+';margin-top:6px">'+summary+'</div></div>';
+}
+function r1(l,inner){ return '<div class="r"><span style="width:168px;flex:none">'+l+'</span>'+inner+'</div>'; }
+function pgSettings(){
+  // absolute layout, same law as storage/ench: content 8..168, scrollbar 168..176;
+  // no inventory block — the page scrolls Y6..242
+  var inner=setbox('视图 / 旅途',
+      r1('旅途模式','<span class="chk" style="margin-right:12px">✔</span><span style="font-size:21px">取出不减库存(物品/资源/经验)</span>')+
+      r1('NBT也免扣','<span class="chk" style="margin-right:12px"></span><span style="font-size:21px">带NBT物品独立开关(默认关=照常扣)</span>'))+
+    autoCard('磁铁',magCfg.on,'范围 5格 · 物品+经验球')+
+    autoCard('喂食',feedCfg.on,'饥饿≥14才吃 · 跳过有害')+
+    autoCard('补货',restCfg.on,'低于保持数量自动补')+
+    setbox('磁铁',
+      r1('范围档位',chips(magCfg.range,['2格','3格','5格','7格','10格']))+
+      r1('经验球',toggle(magCfg.xp)+' <span style="font-size:21px">折算进存储xp</span>'))+
+    setbox('自动喂食',
+      r1('饥饿阈值','<input type="text" class="narrow" value="'+feedCfg.hunger+'"> <span style="font-size:21px">≥此值才吃 (0-19)</span>')+
+      r1('跳过有害',toggle(feedCfg.skipBad)+' <span style="font-size:21px">腐烂/毒蜘蛛眼等排除</span>')+
+      '<div class="fl-lbl">优先食物槽 (手持物品点格设置)</div><div class="row9">'+
+      (function(){var h='';for(var i=0;i<9;i++)h+='<div class="scell"></div>';return h;})()+'</div>')+
+    setbox('补货',
+      r1('保持数量','<input type="text" class="narrow" value="64"> <span style="font-size:21px">低于此数从终端补 (1-64)</span>')+
+      '<div class="fl-lbl">补货清单槽</div><div class="row9">'+
+      (function(){var h='';for(var i=0;i<9;i++)h+='<div class="scell"></div>';return h;})()+'</div>');
+  return '<div style="position:relative;width:528px;height:750px">'+
+    '<div class="escroll" id="slist" style="position:absolute;left:24px;top:18px;width:480px;height:708px">'+inner+'</div>'+
+    '<div class="vbar" id="sbar" style="position:absolute;left:504px;top:18px;height:708px"><div class="k"></div></div></div>';
+}
+function pgEnergy(){
+  // 能源页 v6: 全绝对布局, 1:1 GuiEnergyPage (窗 214x251 GUI, 面板 176x251)
+  // 行卡: 满宽背景卡(rgba .14 + #9a9a9a 框, mrow 视觉律), 卡高42 縲6; 滚动条贴右框(168..176 律)
+  var list=[['(128,64,-35)','火力发电机',1,'主世界','RF','0'],
+            ['(130,64,-35)','电炉',0,'主世界','EU','512'],
+            ['(12,70,88)','MFE',0,'下界','EU','128'],
+            ['(0,70,88)','MFSU',0,'主世界','EU','2048'],
+            ['(33,64,-90)','地热发电机',1,'主世界','EU','0'],
+            ['(40,64,-90)','风力动能发生器',1,'主世界','EU','0'],
+            ['(12,70,88)','充电台',0,'下界','EU','64'],
+            ['(15,70,88)','物质生成器',0,'下界','EU','4096']];
+  var rows='';
+  for(var i=0;i<list.length;i++){
+    var m=list[i], col=m[2]?'#7fff7f':'#ff5555', top=i*72;
+    rows+='<div style="position:absolute;left:0;top:'+top+'px;width:480px;height:66px;'+
+      'background:rgba(0,0,0,.14);border:3px solid #9a9a9a">'+
+      '<span style="position:absolute;left:6px;top:21px;width:24px;height:24px;background:'+col+
+        ';border:3px solid #030303" title="'+(m[2]?'存 (机器→池)':'取 (池→机器)')+'"></span>'+
+      '<span style="position:absolute;left:39px;top:3px;font-size:24px;line-height:24px;color:#404040;white-space:nowrap">'+m[1]+
+        ' <span style="color:#909090">['+m[4]+']</span></span>'+
+      '<span style="position:absolute;left:39px;top:33px;font-size:24px;line-height:24px;color:#707070;white-space:nowrap">'+m[3]+' '+m[0]+
+        ' · <span style="color:#ff5555">'+m[5]+'/t</span></span>'+
+      '<span class="chip" style="position:absolute;right:6px;top:15px;width:36px;height:36px;'+
+        'justify-content:center" title="取消标记">X</span></div>';
+  }
+  return '<div style="position:relative;width:528px;height:753px">'+
+    '<div style="position:absolute;left:24px;top:27px;font-size:24px;color:#404040">电量: '+
+      '<span style="color:#80ff20">19.2M RF</span></div>'+
+    '<div style="position:absolute;left:24px;top:72px;font-size:24px;color:#404040">标记机器 ('+list.length+')</div>'+
+    '<div id="mlist" style="position:absolute;left:24px;top:102px;width:480px;height:360px;overflow:hidden">'+
+      '<div style="position:relative;width:480px;height:'+(list.length*72)+'px">'+rows+'</div></div>'+
+    '<div class="vbar" id="mbar" style="position:absolute;left:504px;top:102px;height:360px"><div class="k"></div></div>'+
+    '<div style="position:absolute;left:24px;top:492px;width:480px;height:6px;background:#999"></div>'+
+    '<div class="inv" style="position:absolute;left:24px;top:507px">'+slots(27)+'</div>'+
+    '<div class="inv" style="position:absolute;left:24px;top:681px">'+slots(9)+'</div></div>';
+}
+// 机器配置页 (手杖 Shift+右键已标记机器): 小窗 — 机器名/坐标 + 存/取单选 + 解除标记
+function pgMachineCfg(){
+  return '<div style="position:relative;width:528px;height:750px">'+
+    '<div class="autobox" style="position:absolute;left:24px;top:39px;width:480px">'+
+    '<div class="t" style="display:flex;align-items:center;gap:9px">机器配置</div>'+
+    '<div class="r" style="padding:6px 6px"><span style="flex:1">火力发电机 <span style="color:#707070">(128,64,-35)</span></span></div>'+
+    '<div style="height:6px"></div>'+
+    '<div class="r" style="padding:3px 6px">'+
+    '<span style="margin-right:21px">方向</span>'+
+    '<span class="chip on">存 (机器→存储池)</span>'+
+    '<span class="chip" style="margin-left:9px">取 (存储池→机器)</span>'+'</div>'+
+    '<div class="r" style="padding:3px 6px">'+
+    '<span style="margin-right:21px">速率</span>'+
+    '<span class="chip on">自适应</span>'+
+    '<span class="chip" style="margin-left:9px">2048/t</span>'+
+    '<span class="chip" style="margin-left:9px">512/t</span>'+
+    '<span class="chip" style="margin-left:9px">32/t</span>'+'</div>'+
+    '<div style="height:9px"></div>'+
+    '<div class="r" style="padding:3px 6px">'+
+    '<span class="chip" style="background:linear-gradient(#a65b5b,#8d4a4a 40%,#6d3636)">解除标记</span>'+
+    '<span style="font-size:21px;color:#707070;margin-left:12px">机器被拆会自动解除</span>'+'</div>'+
+    '</div></div>';
+}
+function pgStaff(){
+  // 手杖 v3 (user call): 节标题带总开关 + 形状切换钮; 精准=toggle, 时运/范围=数字输入框
+  var staff={on:1,fortune:0,silk:0,range:8,shape:0};
+  // 形状语义对齐 UselessMod ChainMiningShapes (FTB Ultimine 命名): 循环顺序即枚举顺序
+  var shapes=['跟随','1x1隧道','3x3','3x3隧道','下阶梯','上阶梯'];
+  var G=window;
+  if(!G.staffCfg) G.staffCfg=staff;
+  var c=G.staffCfg;
+  function numBox(key,tip,dead){
+    // dead: 废弃样式 (label grey, box dimmed, not clickable) — used on 时运 while 精准 is on
+    return dead
+      ? '<input type="text" class="narrow" value="'+c[key]+'" disabled style="width:54px;height:30px;text-align:center;color:#999;background:#3a3a3a;border-color:#555">'
+      : '<input type="text" class="narrow" value="'+c[key]+'" '+
+        'onchange="staffNum(\''+key+'\',this.value)" title="'+tip+'" style="width:54px;height:30px;text-align:center">';
+  }
+  function silToggle(){
+    return '<span class="chk'+(c.silk?'" style="color:#7fff7f':'"')+' onclick="c.silk=c.silk?0:1;c.fortune=0;render()">'+(c.silk?'✔':'')+'</span>';
+  }
+  var topModes=['普通','连锁挖矿','设置电力'];
+  var digModes=['普通','增强','挖空'];
+  // 分区: 上=基础, 下=顶模式 (title 行=模式 chip, 游戏内 Shift+右键同效果)
+  var inner=setbox('基础',
+      '<div class="r" style="padding:3px 6px">'+
+      '<span class="chk" style="margin-right:9px'+(c.silk?';color:#7fff7f':'')+'" onclick="c.silk=c.silk?0:1;c.fortune=0;render()">'+(c.silk?'✔':'')+'</span>'+
+      '<span>精准</span>'+
+      '<span style="margin-left:21px">时运等级:</span>'+numBox('fortune','0~255, 与精准互斥',c.silk)+'<span style="margin-left:6px;color:'+(c.silk?'#aaa':'#707070')+'">0~255</span>'+
+      '</div>')+
+    '<div class="autobox"><div class="t" style="display:flex;align-items:center;gap:9px">'+
+      '<span class="chip" onclick="c.top=(c.top+1)%3;render()" title="Shift+右键切换">'+
+      '模式:'+topModes[c.top||0]+'</span>'+
+      '<span style="font-size:18px;color:#909090">Shift+右键切换</span></div>'+
+      '<div class="r" style="padding:3px 6px">'+
+      '<span style="margin-left:0">范围</span>'+numBox('range','X/Y/Z 同值')+
+      '<span class="chip" style="margin-left:21px" onclick="c.shape=(c.shape+1)%'+shapes.length+';render()" title="点击循环切换">形状:'+shapes[c.shape]+'</span>'+
+      '<span class="chip" style="margin-left:9px" onclick="c.dig=(c.dig||0)+1;c.dig%=3;render()" title="点击循环切换">挖法:'+digModes[c.dig||0]+'</span>'+
+      '</div></div>';
+  // absolute, no inventory: content Y6..242, scrollbar flush right (same law as settings)
+  return '<div style="position:relative;width:528px;height:750px">'+
+    '<div class="escroll" id="tlist" style="position:absolute;left:24px;top:18px;width:480px;height:708px">'+inner+'</div>'+
+    '<div class="vbar" id="tbar" style="position:absolute;left:504px;top:18px;height:708px"><div class="k"></div></div></div>';
+}
+function staffNum(key,raw){
+  var v=parseInt(raw,10);
+  if(isNaN(v)) return;
+  var max=key==='fortune'?255:1000000;
+  var min=key==='range'?1:0;
+  staffCfg[key]=Math.max(min,Math.min(max,v));
+  if(key==='fortune'&&staffCfg.fortune>0) staffCfg.silk=0;
+  render();
+}
+var mobDemo=[['苦力怕','Creeper',2,''],['僵尸','Zombie',3,'村民NBT×1 · 持铁剑×1'],
+             ['牛','Cow',5,''],['末影人','Enderman',1,'携带方块:泥土'],
+             ['骷髅','Skeleton',4,''],['猪','Pig',2,''],
+             ['蜘蛛','Spider',1,''],['女巫','Witch',1,'']];
+function pgMobs(){
+  var cells='';
+  mobDemo.forEach(function(m){
+    cells+='<div class="mcell">'+
+      '<span class="nm">'+m[0].substring(0,3)+'</span>'+
+      (m[3]?'<span class="nbt" title="'+m[3]+'"></span>':'')+
+      '<span class="ct">x'+m[2]+'</span></div>';
+  });
+  var inner='<div class="mobgrid">'+cells+'</div>';
+  // absolute: search Y6 | count Y20 | mob grid Y39..139 (scrolls) |
+  // rule Y164 | inventory
+  return '<div style="position:relative;width:528px;height:750px">'+
+    '<input class="search" style="position:absolute;left:24px;top:9px;width:387px;height:36px">'+
+    '<div style="position:absolute;left:24px;top:60px;font-size:24px;color:#404040">已捕捉 ('+mobDemo.length+' 种 / 19 只)</div>'+
+    '<div class="escroll" id="blist" style="position:absolute;left:24px;top:108px;width:480px;height:300px">'+inner+'</div>'+
+    '<div class="vbar" id="bbar" style="position:absolute;left:504px;top:108px;height:300px"><div class="k"></div></div>'+
+    '<div style="position:absolute;left:24px;top:492px;width:480px;height:6px;background:#999"></div>'+
+    '<div class="inv" style="position:absolute;left:24px;top:507px">'+slots(27)+'</div>'+
+    '<div class="inv" style="position:absolute;left:24px;top:687px">'+slots(9)+'</div></div>';
+}
+
+function render(){
+  renderRail();
+  var pg={storage:pgStorage,ench:pgEnch,energy:pgEnergy,staff:pgStaff,mobs:pgMobs,settings:pgSettings,machcfg:pgMachineCfg}[cur];
+  document.getElementById('page').innerHTML=pg();
+  bindListScroll('elist','ebar');   // ench
+  bindListScroll('mlist','mbar');   // energy machines
+  bindListScroll('blist','bbar');   // mobs grid
+  bindListScroll('tlist','tbar');   // staff
+  bindListScroll('slist','sbar');   // settings
+  var sb=document.getElementById('sortBtn'); // game: mode X175 W24 + dir X199 W12, two buttons
+  if(sb) sb.onclick=function(){ sortIdx=(sortIdx+1)%sorts.length; this.firstElementChild.textContent=sorts[sortIdx]; };
+  var sd=document.getElementById('sortDir');
+  if(sd) sd.onclick=function(){ asc=!asc; this.firstElementChild.textContent=asc?'▲':'▼'; };
+}
+/* list scrollbars (storage-law widget): knob height FIXED at 24 GUI (72css),
+   travel = track - knob where track = bar height - 2*bevel(4 GUI);
+   hidden entirely when the content fits (game: view.size <= rows*COLS).
+   document-level drag listeners bound ONCE (render() rebuilds panes) */
+var listDrag=null;
+function bindListScroll(bodyId,barId){
+  var body=document.getElementById(bodyId), bar=document.getElementById(barId);
+  if(!body||!bar) return;
+  var knob=bar.querySelector('.k');
+  function travel(){ return bar.clientHeight-12-72; }
+  function upd(){
+    var vh=body.clientHeight, ch=body.scrollHeight;
+    if(ch<=vh){ knob.style.display='none'; return; }
+    knob.style.display='block';
+    knob.style.top=(6+Math.round(travel()*body.scrollTop/(ch-vh)))+'px';
+  }
+  body.addEventListener('scroll',upd);
+  body.addEventListener('wheel',function(e){
+    body.scrollTop+=(e.deltaY>0?69:-69); // one row per notch
+    upd(); e.preventDefault();
+  },{passive:false});
+  knob.addEventListener('mousedown',function(e){ listDrag={body:body,bar:bar}; e.preventDefault(); });
+  if(!bindListScroll._doc){
+    bindListScroll._doc=1;
+    document.addEventListener('mousemove',function(e){
+      if(!listDrag) return;
+      var r=listDrag.bar.getBoundingClientRect();
+      var t=(e.clientY-r.top-6-36)/Math.max(1,listDrag.bar.clientHeight-12-72);
+      t=Math.max(0,Math.min(1,t));
+      listDrag.body.scrollTop=t*(listDrag.body.scrollHeight-listDrag.body.clientHeight);
+    });
+    document.addEventListener('mouseup',function(){ listDrag=null; });
+  }
+  upd();
+}
+(function(){ var m=location.search.match(/cur=(\w+)/);
+  if(m){ for(var i=0;i<TABS.length;i++) if(TABS[i].id===m[1]) cur=TABS[i].id;
+         for(var j=0;j<PINNED.length;j++) if(PINNED[j].id===m[1]) cur=PINNED[j].id;
+         if(m[1]==='machcfg') cur='machcfg'; } })();
+(function(){ var bm=location.search.match(/band=(\d)/); if(bm) bandMode=+bm[1]; })();
+// 窗口高度 = 存储页高度 (锚点; 其他页装入同高窗口, 滚动页靠自绘滚动条)
+(function(){
+  var win=document.querySelector('.win'), pgEl=document.getElementById('page');
+  var pages={storage:pgStorage,ench:pgEnch,energy:pgEnergy,staff:pgStaff,mobs:pgMobs,settings:pgSettings};
+  var keep=cur;
+  win.classList.add('measure');
+  cur='storage'; pgEl.innerHTML=pages.storage();
+  win.style.height='auto'; var maxH=win.offsetHeight;
+  win.classList.remove('measure');
+  cur=keep; win.style.height=maxH+'px';
+  if(location.search.indexOf('measure=1')>=0) document.title='WIN_H='+win.offsetHeight;
+  if(location.search.indexOf('measure=2')>=0){
+    var out=[];
+    var h=document.querySelector('.bandmid .harrow');
+    var bl=document.querySelector('.bleft'), br=document.querySelector('.bright');
+    var bd=document.querySelector('.band');
+    if(h&&bl&&br&&bd){
+      function rr(el,n){ var r=el.getBoundingClientRect(); return n+Math.round(r.left)+'-'+Math.round(r.right); }
+      out.push(rr(h,'arrow:')); out.push(rr(bl,'bleft:')); out.push(rr(br,'bright:'));
+      var sc=document.querySelector('.screen'), pg=document.getElementById('page'), fr=document.querySelector('.frow');
+      out.push(rr(bd,'band:')); out.push('bandW:'+bd.offsetWidth+'frowW:'+(fr?fr.offsetWidth:-1)+'pageW:'+pg.offsetWidth+'screenW:'+sc.offsetWidth);
+      var blc=bl.firstElementChild, brc=br.firstElementChild;
+      if(blc) out.push(rr(blc,'blc:')); if(brc) out.push(rr(brc,'brc:'));
+      document.title='M2|'+out.join('|');
+    }
+  }
+})();
+render();
+// real-layout measurement: AFTER render() so the rail is populated
+(function(){
+  if(location.search.indexOf('measure=2')<0) return;
+  var out=[];
+  var vb=document.querySelector('.vbar'), gr=document.querySelector('.grid');
+  var h=document.querySelector('.bandmid .harrow');
+  var sc=document.querySelector('.screen'), pg=document.getElementById('page');
+  function rr(el,n){ var r=el.getBoundingClientRect(); return n+Math.round(r.left)+'-'+Math.round(r.right)+'h'+Math.round(r.height); }
+  if(vb) out.push(rr(vb,'vbar:'));
+  if(gr) out.push(rr(gr,'grid:'));
+  if(h) out.push(rr(h,'arrow:'));
+  out.push(rr(sc,'screen:')); out.push(rr(pg,'page:'));
+  document.title='M2|'+out.join('|');
+})();
+(function(){
+  if(location.search.indexOf('measure=3')<0) return;
+  var btns=document.querySelectorAll('.cat,.chip,#sortBtn');
+  var parts=[];
+  for(var i=0;i<btns.length;i++){
+    var b=btns[i];
+    parts.push(b.textContent.trim().slice(0,4)+':cw'+b.scrollWidth+':need'+(b.scrollWidth)+'/'+b.offsetWidth+(b.scrollWidth>b.offsetWidth?'!OVERFLOW':''));
+  }
+  document.title='M3|'+parts.join('|');
+})();
+(function(){
+  var win=document.querySelector('.win');
+  if(win.scrollHeight>win.clientHeight+1) console.error('OVERFLOW content '+win.scrollHeight+' > win '+win.clientHeight);
+  var iv=document.querySelector('.invwrap'), pg2=document.getElementById('page');
+  if(iv && pg2){
+    var gap=Math.round(pg2.getBoundingClientRect().bottom-iv.getBoundingClientRect().bottom);
+    if(gap>2) console.error('INV NOT PINNED gap='+gap);
+  }
+  var el=document.getElementById('elist'), inv=document.querySelector('.inv');
+  if(el&&inv&&el.offsetWidth!==inv.offsetWidth)
+    console.error('ENCH LIST WIDTH '+el.offsetWidth+' != INV '+inv.offsetWidth);
+  if(el&&inv&&el.offsetLeft!==inv.offsetLeft)
+    console.error('ENCH LIST LEFT '+el.offsetLeft+' != INV '+inv.offsetLeft);
+  var eb=document.getElementById('ebar'), page=document.getElementById('page');
+  if(eb&&page&&eb.offsetLeft+eb.offsetWidth!==page.clientWidth)
+    console.error('EVAR NOT FLUSH RIGHT '+eb.offsetLeft+'+'+eb.offsetWidth+' != '+page.clientWidth);
+})();
+</script>
+</body>
+</html>
