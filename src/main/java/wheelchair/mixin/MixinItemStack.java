@@ -3,6 +3,7 @@ package wheelchair.mixin;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -38,5 +39,16 @@ public abstract class MixinItemStack {
         } else {
             wheelchair$self().stackSize = nbt.getByte("Count");
         }
+    }
+
+    /**
+     * Runtime override (InfiniStack law): the startup field sweep only covers
+     * items registered before us — later mods keep a 64 limit and vanilla's
+     * per-slot merge math then breaks big stacks. Always report int-max for
+     * anything that was stackable; true unstackables stay 1.
+     */
+    @Overwrite
+    public int getMaxStackSize() {
+        return wheelchair$self().getItem().getItemStackLimit() == 1 ? 1 : Integer.MAX_VALUE;
     }
 }

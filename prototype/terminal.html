@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<title>轮椅Mod 终端 · 原型 v26 · 游戏内 100% 复刻版</title>
+<title>轮椅Mod 终端 · 原型 v27 · 游戏内 100% 复刻版</title>
 <style>
   /* ============================================================
      尺寸体系: 1 MC GUI px = 3 CSS px (1.7.10 源码实证, 见 skills/mc1710)
@@ -247,6 +247,11 @@
   .xptag.hint { border-bottom:none; position:absolute; } /* must beat .hint{position:relative} */
   .abtn.hint { border-bottom:3px solid #030303; } /* keep the vanilla outline; hint only adds the tooltip */
 
+  /* accel page: inline number box (black bed + grey frame, centered) */
+  .abx { background:#000; border:3px solid #a0a0a0; color:#e0e0e0; font-family:inherit;
+         font-size:24px; text-align:center; outline:none; height:42px; }
+  .abx:focus { border-color:#fff; }
+
   .cap { color:#888; font-size:12px; margin-top:12px; text-align:center; max-width:700px; }
 </style>
 </head>
@@ -269,6 +274,7 @@ var TABS=[
   {id:'storage',txt:'存储',n:'存储+合成/拆解切换'},
   {id:'ench',txt:'附魔',n:'附魔库'},
   {id:'energy',txt:'能源',n:'能源管理 (RF)'},
+  {id:'accel',txt:'加速',n:'加速管理 (区域 TE 加速)'},
   {id:'mobs',txt:'生物',n:'生物库'},
 ];
 var PINNED=[
@@ -479,6 +485,63 @@ function pgEnergy(){
     '<div class="inv" style="position:absolute;left:24px;top:507px">'+slots(27)+'</div>'+
     '<div class="inv" style="position:absolute;left:24px;top:681px">'+slots(9)+'</div></div>';
 }
+// 加速页 v5: 两种标记 — 方块行(坐标+半径框+倍率框) / 生物行(倍率框);
+// 副行只显剩余时间(永久/-1); 主行=维度坐标/生物名;
+// 手势: 手杖(加速)右键加入/再点移除; 默认时长来自手杖页(秒, -1永久)
+function pgAccel(){
+  var RA=[1,2,4,8,16], MA=[2,4,8,16,32,64,128,256]; // 档位: 左键放大一档, 右键缩小一档
+  if(!window.accelList) window.accelList=[
+    {dim:'主世界',x:128,y:64,z:-35,r:4,m:4,cov:3,time:120},
+    {dim:'主世界',x:130,y:64,z:-35,r:4,m:8,cov:1,time:-1},
+    {mob:'小牛',m:8,time:60},
+    {mob:'鸡',m:4,time:-1},
+    {dim:'下界',x:12,y:70,z:88,r:4,m:4,cov:1,time:300},
+    {dim:'主世界',x:33,y:64,z:-90,r:8,m:2,cov:1,time:45}];
+  var list=window.accelList;
+  var rows='';
+  for(var i=0;i<list.length;i++){
+    var m=list[i], top=i*72, isMob=!!m.mob;
+    var col=isMob?'#ffff55':'#7fc8ff';
+    var main=isMob?m.mob:m.dim+' ('+m.x+','+m.y+','+m.z+')';
+    var ldm=(m.cov||1)*(m.m-1);
+    var sub=(m.time<0?'永久':'剩余'+m.time+'s')+' · 负载'+ldm+'/t';
+    rows+='<div style="position:absolute;left:0;top:'+top+'px;width:480px;height:66px;'+
+      'background:rgba(0,0,0,.14);border:3px solid #9a9a9a">'+
+      '<span style="position:absolute;left:6px;top:21px;width:24px;height:24px;background:'+col+';'+
+        'border:3px solid #030303" title="'+(isMob?'生物加速':'区域加速')+'"></span>'+
+      '<span style="position:absolute;left:39px;top:3px;font-size:24px;line-height:24px;color:#404040;white-space:nowrap;overflow:hidden;max-width:264px">'+main+'</span>'+
+      '<span style="position:absolute;left:39px;top:33px;font-size:24px;line-height:24px;color:#707070;white-space:nowrap;overflow:hidden;max-width:264px">'+sub+'</span>'+
+      '<div style="position:absolute;right:6px;top:15px;display:flex;gap:6px;align-items:center">'+
+      (isMob?'':
+      '<span class="chip" style="height:36px;padding:0 12px" title="半径档位 1/2/4/8/16\n左键放大 · 右键缩小" '+
+        'onclick="accelStep('+i+',\'r\',1)" oncontextmenu="accelStep('+i+',\'r\',-1);return false">'+m.r+'格</span>')+
+      '<span class="chip" style="height:36px;padding:0 12px" title="倍率档位 2/4/8/16/32/64/128/256\n左键放大 · 右键缩小" '+
+        'onclick="accelStep('+i+',\'m\',1)" oncontextmenu="accelStep('+i+',\'m\',-1);return false">×'+m.m+'</span>'+
+      '<span class="chip" style="width:36px;height:36px;padding:0;justify-content:center" title="移除加速标记">X</span></div></div>';
+  }
+  if(!list.length) rows='<div style="padding:60px 0;text-align:center;font-size:24px;color:#707070">'+
+    '手持手杖(加速)右键机器/生物加入</div>';
+  var load=0; for(var j=0;j<list.length;j++) load+=(list[j].cov||1)*(list[j].m-1);
+  return '<div style="position:relative;width:528px;height:753px">'+
+    '<div style="position:absolute;left:24px;top:27px;display:flex;gap:9px;align-items:center">'+
+      '<span style="font-size:24px;color:#404040">全局</span>'+
+      '<span class="chip on" title="全部加速标记总开关">开</span></div>'+
+    '<div style="position:absolute;right:24px;top:27px;font-size:24px;color:#404040">额外负载 <span style="color:#7fc8ff">~'+load+' 次/t</span></div>'+
+    '<div style="position:absolute;left:24px;top:72px;font-size:24px;color:#404040">加速标记 ('+list.length+')</div>'+
+    '<div id="alist" style="position:absolute;left:24px;top:102px;width:480px;height:360px;overflow:hidden">'+
+      '<div style="position:relative;width:480px;height:'+(list.length*72)+'px">'+rows+'</div></div>'+
+    '<div class="vbar" id="abar" style="position:absolute;left:504px;top:102px;height:360px"><div class="k"></div></div>'+
+    '<div style="position:absolute;left:24px;top:492px;width:480px;height:6px;background:#999"></div>'+
+    '<div class="inv" style="position:absolute;left:24px;top:507px">'+slots(27)+'</div>'+
+    '<div class="inv" style="position:absolute;left:24px;top:687px">'+slots(9)+'</div></div>';
+}
+var ACCEL_R=[1,2,4,8,16], ACCEL_M=[2,4,8,16,32,64,128,256];
+function accelStep(i,key,dir){
+  var arr=key==='r'?ACCEL_R:ACCEL_M, m=window.accelList[i];
+  var idx=arr.indexOf(m[key]); if(idx<0) idx=0;
+  m[key]=arr[(idx+dir+arr.length)%arr.length];
+  render();
+}
 // 机器配置页 (手杖 Shift+右键已标记机器): 小窗 — 机器名/坐标 + 存/取单选 + 解除标记
 function pgMachineCfg(){
   return '<div style="position:relative;width:528px;height:750px">'+
@@ -504,48 +567,53 @@ function pgMachineCfg(){
 }
 function pgStaff(){
   // 手杖 v3 (user call): 节标题带总开关 + 形状切换钮; 精准=toggle, 时运/范围=数字输入框
-  var staff={on:1,fortune:0,silk:0,range:8,shape:0};
+  var staff={on:1,fortune:0,silk:0,range:8,shape:0,time:120};
   // 形状语义对齐 UselessMod ChainMiningShapes (FTB Ultimine 命名): 循环顺序即枚举顺序
   var shapes=['跟随','1x1隧道','3x3','3x3隧道','下阶梯','上阶梯'];
   var G=window;
   if(!G.staffCfg) G.staffCfg=staff;
   var c=G.staffCfg;
-  function numBox(key,tip,dead){
+  function numBox(key,tip,dead,w){
     // dead: 废弃样式 (label grey, box dimmed, not clickable) — used on 时运 while 精准 is on
+    var W=(w||54)+'px';
     return dead
-      ? '<input type="text" class="narrow" value="'+c[key]+'" disabled style="width:54px;height:30px;text-align:center;color:#999;background:#3a3a3a;border-color:#555">'
+      ? '<input type="text" class="narrow" value="'+c[key]+'" disabled style="width:'+W+';height:30px;text-align:center;color:#999;background:#3a3a3a;border-color:#555">'
       : '<input type="text" class="narrow" value="'+c[key]+'" '+
-        'onchange="staffNum(\''+key+'\',this.value)" title="'+tip+'" style="width:54px;height:30px;text-align:center">';
+        'onchange="staffNum(\''+key+'\',this.value)" title="'+tip+'" style="width:'+W+';height:30px;text-align:center">';
   }
   function silToggle(){
     return '<span class="chk'+(c.silk?'" style="color:#7fff7f':'"')+' onclick="c.silk=c.silk?0:1;c.fortune=0;render()">'+(c.silk?'✔':'')+'</span>';
   }
-  var topModes=['普通','连锁挖矿','设置电力'];
+  var topModes=['普通','连锁挖矿','设置电力','整地'];
   var digModes=['普通','增强','挖空'];
-  // 分区: 上=基础, 下=顶模式 (title 行=模式 chip, 游戏内 Shift+右键同效果)
+  // 分区: 基础 / 连锁采掘(范围+形状+挖法) / 加速(时长); 顶模式 chip = 页面右上角
   var inner=setbox('基础',
       '<div class="r" style="padding:3px 6px">'+
       '<span class="chk" style="margin-right:9px'+(c.silk?';color:#7fff7f':'')+'" onclick="c.silk=c.silk?0:1;c.fortune=0;render()">'+(c.silk?'✔':'')+'</span>'+
       '<span>精准</span>'+
       '<span style="margin-left:21px">时运等级:</span>'+numBox('fortune','0~255, 与精准互斥',c.silk)+'<span style="margin-left:6px;color:'+(c.silk?'#aaa':'#707070')+'">0~255</span>'+
       '</div>')+
-    '<div class="autobox"><div class="t" style="display:flex;align-items:center;gap:9px">'+
-      '<span class="chip" onclick="c.top=(c.top+1)%3;render()" title="Shift+右键切换">'+
-      '模式:'+topModes[c.top||0]+'</span>'+
-      '<span style="font-size:18px;color:#909090">Shift+右键切换</span></div>'+
+    setbox('连锁采掘',
       '<div class="r" style="padding:3px 6px">'+
       '<span style="margin-left:0">范围</span>'+numBox('range','X/Y/Z 同值')+
       '<span class="chip" style="margin-left:21px" onclick="c.shape=(c.shape+1)%'+shapes.length+';render()" title="点击循环切换">形状:'+shapes[c.shape]+'</span>'+
       '<span class="chip" style="margin-left:9px" onclick="c.dig=(c.dig||0)+1;c.dig%=3;render()" title="点击循环切换">挖法:'+digModes[c.dig||0]+'</span>'+
-      '</div></div>';
-  // absolute, no inventory: content Y6..242, scrollbar flush right (same law as settings)
+      '</div>')+
+    setbox('加速',
+      '<div class="r" style="padding:3px 6px">'+
+      '<span>加速时长</span>'+numBox('time','单位秒, -1=永久',false,84)+
+      '</div>');
+  // absolute, no inventory, 内容矮不滚动 — 无滚动条;
+  // 顶模式 chip 右上角 (right 54 = 18 GUI)
   return '<div style="position:relative;width:528px;height:750px">'+
-    '<div class="escroll" id="tlist" style="position:absolute;left:24px;top:18px;width:480px;height:708px">'+inner+'</div>'+
-    '<div class="vbar" id="tbar" style="position:absolute;left:504px;top:18px;height:708px"><div class="k"></div></div></div>';
+    '<span class="chip" style="position:absolute;right:54px;top:9px" onclick="c.top=(c.top+1)%4;render()" title="Shift+右键切换">'+
+    '模式:'+topModes[c.top||0]+'</span>'+
+    '<div style="position:absolute;left:24px;top:18px;width:480px;height:708px;overflow:hidden">'+inner+'</div></div>';
 }
 function staffNum(key,raw){
   var v=parseInt(raw,10);
   if(isNaN(v)) return;
+  if(key==='time'){ staffCfg.time=Math.max(-1,Math.min(86400,v)); render(); return; }
   var max=key==='fortune'?255:1000000;
   var min=key==='range'?1:0;
   staffCfg[key]=Math.max(min,Math.min(max,v));
@@ -579,12 +647,12 @@ function pgMobs(){
 
 function render(){
   renderRail();
-  var pg={storage:pgStorage,ench:pgEnch,energy:pgEnergy,staff:pgStaff,mobs:pgMobs,settings:pgSettings,machcfg:pgMachineCfg}[cur];
+  var pg={storage:pgStorage,ench:pgEnch,energy:pgEnergy,accel:pgAccel,staff:pgStaff,mobs:pgMobs,settings:pgSettings,machcfg:pgMachineCfg}[cur];
   document.getElementById('page').innerHTML=pg();
   bindListScroll('elist','ebar');   // ench
   bindListScroll('mlist','mbar');   // energy machines
+  bindListScroll('alist','abar');   // accel marks
   bindListScroll('blist','bbar');   // mobs grid
-  bindListScroll('tlist','tbar');   // staff
   bindListScroll('slist','sbar');   // settings
   var sb=document.getElementById('sortBtn'); // game: mode X175 W24 + dir X199 W12, two buttons
   if(sb) sb.onclick=function(){ sortIdx=(sortIdx+1)%sorts.length; this.firstElementChild.textContent=sorts[sortIdx]; };

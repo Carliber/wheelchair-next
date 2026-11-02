@@ -76,7 +76,7 @@ public class GuiEnchPage extends GuiContainer {
     private static final int LVLBOX_X = 172, LVLBOX_W = 26, LVLBOX_H = 16; // right edge 198: 5 clear of the scrollbar
     private static final int INV_LINE_Y_3ROW = 165, HOT_Y_3ROW = 228, INV_X = 43;
 
-    private static final String[] RAIL_TABS = {"存储", "附魔", "能源"};
+    private static final String[] RAIL_TABS = {"存储", "附魔", "能源", "加速"};
     private static final String[] RAIL_PIN = {"手杖", "设置"};
     private static final int ACTIVE_TAB = 1; // 附魔
 
@@ -626,15 +626,24 @@ public class GuiEnchPage extends GuiContainer {
             }
         }
         // rail tabs: storage/energy open their pages; the ench tab is this page
+        net.minecraft.client.gui.ScaledResolution sr0 = null;
         for (int i = 0; i < RAIL_TABS.length; i++) {
             if (i != ACTIVE_TAB && inRect(mx, my, guiLeft + RAIL_X + 1, guiTop + 6 + i * 17, 26, 15)) {
                 if (i == 0) {
-                    net.minecraft.client.gui.ScaledResolution sr =
-                            new net.minecraft.client.gui.ScaledResolution(this.mc, this.mc.displayWidth, this.mc.displayHeight);
-                    int rows = wheelchair.client.GuiStoragePage.rowsFor(sr.getScaledHeight());
+                    sr0 = new net.minecraft.client.gui.ScaledResolution(
+                            this.mc, this.mc.displayWidth, this.mc.displayHeight);
+                    int rows = wheelchair.client.GuiStoragePage.rowsFor(sr0.getScaledHeight());
                     WheelchairMod.network.sendToServer(new PacketOpenTerminal(0, rows));
                 } else if (i == 2) {
-                    WheelchairMod.network.sendToServer(new PacketOpenTerminal(6, 3));
+                    if (sr0 == null) sr0 = new net.minecraft.client.gui.ScaledResolution(
+                            this.mc, this.mc.displayWidth, this.mc.displayHeight);
+                    WheelchairMod.network.sendToServer(new PacketOpenTerminal(6,
+                            wheelchair.client.GuiStoragePage.rowsFor(sr0.getScaledHeight())));
+                } else if (i == 3) {
+                    if (sr0 == null) sr0 = new net.minecraft.client.gui.ScaledResolution(
+                            this.mc, this.mc.displayWidth, this.mc.displayHeight);
+                    WheelchairMod.network.sendToServer(new PacketOpenTerminal(7,
+                            wheelchair.client.GuiStoragePage.rowsFor(sr0.getScaledHeight())));
                 }
                 return;
             }

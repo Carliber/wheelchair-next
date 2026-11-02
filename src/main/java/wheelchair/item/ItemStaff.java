@@ -1,5 +1,6 @@
 package wheelchair.item;
 
+import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
@@ -58,15 +59,32 @@ public class ItemStaff extends Item {
 
     @Override
     public ItemStack onItemRightClick(ItemStack stack, World world, EntityPlayer p) {
-        // Shift+right-click into AIR also cycles the mode (onItemUse only fires on a block face)
-        if (!world.isRemote && p.isSneaking()) cycleMode(p, world);
+        if (world.isRemote) return stack;
+        if (p.isSneaking()) {
+            // Shift+right-click into AIR also cycles the mode (onItemUse only fires on a block face)
+            cycleMode(p, world);
+            return stack;
+        }
+        // 整地 also fires on right-click into AIR (onItemUse only fires on a block face)
+        if (wheelchair.value.StaffProfile.get(world).topMode == 3) {
+            landLevel((net.minecraft.entity.player.EntityPlayerMP) p, world);
+        }
         return stack;
+    }
+
+    /** true when the staff's power-mark gesture owns the right-click — machine
+     *  blocks must yield (return false) so ItemStaff.onItemUse can run */
+    public static boolean gesturing(EntityPlayer p, World w) {
+        ItemStack held = p.getHeldItem();
+        if (held == null || held.getItem() != STAFF) return false;
+        return w.isRemote ? wheelchair.value.StaffProfile.cTopMode >= 2
+                          : wheelchair.value.StaffProfile.get(w).topMode >= 2;
     }
 
     /** the single mode-cycle write: profile + chat + client mirror push */
     private static void cycleMode(EntityPlayer p, World world) {
         wheelchair.value.StaffProfile prof = wheelchair.value.StaffProfile.get(world);
-        prof.topMode = (prof.topMode + 1) % 3;
+        prof.topMode = (prof.topMode + 1) % 5;
         prof.markDirty();
         p.addChatMessage(new net.minecraft.util.ChatComponentText(
                 "§e手杖模式: " + wheelchair.value.StaffProfile.TOP_MODE_NAMES[prof.topMode]));
@@ -91,6 +109,18 @@ public class ItemStaff extends Item {
             cycleMode(p, world);
             return true;
         }
+        if (prof.topMode == 3) { landLevel((net.minecraft.entity.player.EntityPlayerMP) p, world); return true; } // 整地: 右键任意处触发
+        if (prof.topMode == 4) { // 加速: 右键方块加入/再点移除
+            wheelchair.value.AccelHub hub = wheelchair.value.AccelHub.get();
+            if (hub == null) return false;
+            int r = hub.staffClickBlock(world, x, y, z, prof.time);
+            if (r == 0) return false; // air — nothing to mark
+            p.addChatMessage(new net.minecraft.util.ChatComponentText(
+                    r == 1 ? "§b已加速标记 " + machineName(world, x, y, z)
+                           : "§c已移除加速 " + machineName(world, x, y, z)));
+            wheelchair.network.AccelNet.broadcast(hub);
+            return true;
+        }
         if (prof.topMode != 2) return false; // only 设置电力 marks machines
         wheelchair.value.EnergyMarkHub hub = wheelchair.value.EnergyMarkHub.get();
         if (hub == null) return false;
@@ -100,6 +130,8 @@ public class ItemStaff extends Item {
                 "§a已标记 " + machineName(world, x, y, z) + " (" + dirWord(hub, world, x, y, z) + ")"));
         if (r == 3) p.addChatMessage(new net.minecraft.util.ChatComponentText(
                 "§e方向切换: " + dirWord(hub, world, x, y, z)));
+        if (r == 4) p.addChatMessage(new net.minecraft.util.ChatComponentText(
+                "§c已取消 " + machineName(world, x, y, z)));
         wheelchair.network.EnergyNet.broadcast(hub, world);
         return true;
     }
@@ -110,6 +142,65 @@ public class ItemStaff extends Item {
         String base = net.minecraft.util.StatCollector.translateToLocal(
                 getUnlocalizedName(s) + ".name");
         return base + wheelchair.value.StaffProfile.modeSuffix();
+    }
+
+    /** 加速模式右键生物: 单体加速标记 (加入/再点移除); 其余模式 vanilla 行为 */
+    @Override
+    public boolean itemInteractionForEntity(ItemStack stack, EntityPlayer p, EntityLivingBase target) {
+        if (p.worldObj.isRemote) return false;
+        wheelchair.value.StaffProfile prof = wheelchair.value.StaffProfile.get(p.worldObj);
+        if (!p.isSneaking() && prof.topMode == 4) {
+            wheelchair.value.AccelHub hub = wheelchair.value.AccelHub.get();
+            if (hub == null) return false;
+            int r = hub.staffClickEntity(p.worldObj, target, prof.time);
+            if (r == 0) return false;
+            p.addChatMessage(new net.minecraft.util.ChatComponentText(
+                    r == 1 ? "§b已加速 " + target.getCommandSenderName()
+                           : "§c已移除加速 " + target.getCommandSenderName()));
+            wheelchair.network.AccelNet.broadcast(hub);
+            return true;
+        }
+        return false;
+    }
+
+    /** 整地 (top mode 3): fill air/water with dirt below the player's feet
+     *  down to bedrock inside the home chunk; clear every NBT-free block
+     *  above — drops go to storage via the frame-sliced dig task. */
+    private static void landLevel(net.minecraft.entity.player.EntityPlayerMP p, World world) {
+        int cx = ((int) Math.floor(p.posX)) >> 4;
+        int cz = ((int) Math.floor(p.posZ)) >> 4;
+        int baseY = (int) Math.floor(p.posY); // 脚
+        java.util.List<int[]> clear = new java.util.ArrayList<int[]>();
+        int filled = 0;
+        for (int xx = cx * 16; xx < cx * 16 + 16; xx++) {
+            for (int zz = cz * 16; zz < cz * 16 + 16; zz++) {
+                for (int y = baseY; y <= 255; y++) { // 地面(脚)起全清, 含人物站位两格
+                    net.minecraft.block.Block b = world.getBlock(xx, y, zz);
+                    if (b == null || b.isAir(world, xx, y, zz)) continue;
+                    if (world.getTileEntity(xx, y, zz) != null) continue; // 保容器/机器
+                    clear.add(new int[]{xx, y, zz});
+                }
+                for (int y = baseY - 1; y >= 0; y--) { // 下方: 空气/水填泥土, 到基岩
+                    net.minecraft.block.Block b = world.getBlock(xx, y, zz);
+                    if (b.isAir(world, xx, y, zz)
+                            || b == net.minecraft.init.Blocks.water
+                            || b == net.minecraft.init.Blocks.flowing_water) {
+                        world.setBlock(xx, y, zz, net.minecraft.init.Blocks.dirt);
+                        filled++;
+                    }
+                }
+            }
+        }
+        wheelchair.value.StaffProfile prof = wheelchair.value.StaffProfile.get(world);
+        wheelchair.value.StaffProfile snap = new wheelchair.value.StaffProfile("snap");
+        snap.silk = prof.silk;
+        snap.fortune = prof.fortune;
+        wheelchair.value.StaffDigTask.start(p,
+                new wheelchair.value.StaffDigTask.ListCells(world, clear,
+                        (int) Math.floor(p.posX), baseY, (int) Math.floor(p.posZ), false),
+                snap, true);
+        p.addChatMessage(new net.minecraft.util.ChatComponentText(
+                "§a整地: 填充 " + filled + " 格 · 清理 " + clear.size() + " 块(掉落入存储)"));
     }
 
     private static String machineName(World w, int x, int y, int z) {

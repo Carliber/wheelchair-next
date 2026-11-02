@@ -17,3 +17,7 @@ screenshots/
 .settings/
 .classpath
 .project
+ref/
+libs/compat/
+compat-libs/
+run-client.log*

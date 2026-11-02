@@ -11,6 +11,17 @@
     "MixinItemStack",
     "MixinInventoryPlayer",
     "MixinInventoryBasic",
-    "MixinNetHandlerPlayServer"
+    "MixinNetHandlerPlayServer",
+    "MixinContainer",
+    "MixinCommandGive",
+    "MixinTileEntityFurnace",
+    "MixinTileEntityChest",
+    "MixinTileEntityDispenser",
+    "MixinTileEntityHopper",
+    "MixinTileEntityBrewingStand",
+    "MixinEntityMinecartContainer",
+    "MixinInventoryLargeChest",
+    "MixinInventoryCrafting",
+    "MixinInventoryCraftResult"
   ]
 }

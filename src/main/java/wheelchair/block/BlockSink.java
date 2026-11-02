@@ -44,6 +44,7 @@ public class BlockSink extends BlockContainer {
     @Override
     public boolean onBlockActivated(World w, int x, int y, int z, EntityPlayer p, int side,
                                      float hx, float hy, float hz) {
+        if (wheelchair.item.ItemStaff.gesturing(p, w)) return false; // 手杖电力手势优先
         if (!w.isRemote) {
             TileEntity te = w.getTileEntity(x, y, z);
             if (te instanceof TileSink) {

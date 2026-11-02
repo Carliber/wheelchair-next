@@ -41,8 +41,14 @@ public class ClientProxy extends CommonProxy {
                     new wheelchair.inventory.ContainerStaff(p.inventory), rows);
         }
         if (id == 6) {
+            int rows = Math.max(3, Math.min(10, x));
             return new wheelchair.client.GuiEnergyPage(
-                    new wheelchair.inventory.ContainerEnergy(p.inventory));
+                    new wheelchair.inventory.ContainerEnergy(p.inventory, rows), rows);
+        }
+        if (id == 7) {
+            int rows = Math.max(3, Math.min(10, x));
+            return new wheelchair.client.GuiAccelPage(
+                    new wheelchair.inventory.ContainerAccel(p.inventory, rows), rows);
         }
         return null;
     }

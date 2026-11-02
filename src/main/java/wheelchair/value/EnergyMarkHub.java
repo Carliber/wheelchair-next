@@ -112,12 +112,18 @@ public final class EnergyMarkHub extends WorldSavedData {
         TileEntity te = w.getTileEntity(x, y, z);
         if (!isMachine(te)) return 0;
         Mark m = find(w.provider.dimensionId, x, y, z);
-        if (m != null) { // marked -> toggle 存⇄取
-            m.store = !m.store;
-            m.ramp = RAMP_START;
-            m.sum = 0; m.ticks = 0; m.rate = 0;
+        if (m != null) {
+            if (m.store) { // 存 -> 取
+                m.store = false;
+                m.ramp = RAMP_START;
+                m.sum = 0; m.ticks = 0; m.rate = 0;
+                markDirty(); version++;
+                return 3;
+            }
+            // 取 -> 取消标记 (cycle: 无 -> 存/取 -> 取 -> 无)
+            marks.remove(m);
             markDirty(); version++;
-            return 3;
+            return 4;
         }
         marks.add(new Mark(w.provider.dimensionId, x, y, z, defaultStore(te), isEuFace(te)));
         markDirty(); version++;

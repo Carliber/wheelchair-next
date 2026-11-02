@@ -1,0 +1,18 @@
+package wheelchair.compat.mixins.openmodslibs;
+
+import openmods.inventory.GenericInventory;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Overwrite;
+import org.spongepowered.asm.mixin.Pseudo;
+import wheelchair.compat.helper.Configurables;
+
+@Mixin(GenericInventory.class)
+@Pseudo
+public abstract class MixinGenericInventory {
+
+    @Overwrite(remap = false)
+    public int func_70297_j_() {
+        return Configurables.maxStackSize;
+    }
+
+}

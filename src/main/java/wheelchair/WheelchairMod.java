@@ -11,6 +11,8 @@ import cpw.mods.fml.common.network.NetworkRegistry;
 import cpw.mods.fml.common.network.simpleimpl.SimpleNetworkWrapper;
 import cpw.mods.fml.relauncher.Side;
 import net.minecraftforge.common.config.Configuration;
+import wheelchair.network.PacketAccelAction;
+import wheelchair.network.PacketAccelSync;
 import wheelchair.network.PacketEnchAction;
 import wheelchair.network.PacketEnchBatch;
 import wheelchair.network.PacketEnergyAction;
@@ -77,6 +79,15 @@ public class WheelchairMod {
         if (cfg.hasChanged()) cfg.save();
 
         proxy.preInit(); // client: keybind O + task queue
+        // ported InfiniStack compat layer (MIT): load its config — reflective so
+        // the -source 1.6 main tree never needs the compat classes at compile time
+        try {
+            Class.forName("wheelchair.compat.infinistack.helper.Configurables")
+                    .getMethod("init", FMLPreInitializationEvent.class).invoke(null, e);
+        } catch (Throwable t) {
+            cpw.mods.fml.common.FMLLog.warning("[wheelchair] compat config init failed: %s",
+                    new Object[]{String.valueOf(t)});
+        }
         wheelchair.item.ItemStaff staff = new wheelchair.item.ItemStaff();
         wheelchair.item.ItemStaff.STAFF = staff;
         cpw.mods.fml.common.registry.GameRegistry.registerItem(staff, "staff");
@@ -106,6 +117,8 @@ public class WheelchairMod {
         network.registerMessage(PacketStaffCfgSync.Handler.class, PacketStaffCfgSync.class, 7, Side.CLIENT);
         network.registerMessage(PacketEnergySync.Handler.class, PacketEnergySync.class, 8, Side.CLIENT);
         network.registerMessage(PacketEnergyAction.Handler.class, PacketEnergyAction.class, 9, Side.SERVER);
+        network.registerMessage(PacketAccelSync.Handler.class, PacketAccelSync.class, 10, Side.CLIENT);
+        network.registerMessage(PacketAccelAction.Handler.class, PacketAccelAction.class, 11, Side.SERVER);
     }
 
     @Mod.EventHandler
@@ -118,6 +131,8 @@ public class WheelchairMod {
                 new wheelchair.value.StaffDigTask());
         // energy-mark transfer engine (mark list + 存/取 + telemetry)
         wheelchair.server.EnergyTick.install();
+        // acceleration-mark engine (TE extra ticks + entity timers)
+        wheelchair.value.AccelHub.install();
         NetworkRegistry.INSTANCE.registerGuiHandler(this, proxy);
         // 手杖配方 = 与 vanilla 木铲完全一样 (X/#/#, X=木板)。两个配方共存于同一
         // 输入 — 这就是合成切换 (‹ ›) 的测试场景: 同输入多产物循环

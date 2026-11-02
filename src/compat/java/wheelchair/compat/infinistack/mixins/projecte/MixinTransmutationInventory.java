@@ -1,0 +1,23 @@
+package wheelchair.compat.mixins.projecte;
+
+import wheelchair.compat.helper.Configurables;
+import moze_intel.projecte.gameObjs.container.inventory.TransmutationInventory;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Pseudo;
+import org.spongepowered.asm.mixin.Overwrite;
+
+@Mixin(TransmutationInventory.class)
+@Pseudo
+public abstract class MixinTransmutationInventory {
+
+    //Well, transmutation table just consume EMC if it exceeds it's limit (which is not high enough)
+
+    //Also, it cause so much lag.
+
+    @Overwrite(remap = false)
+    public int func_70297_j_()
+    {
+        return Configurables.transmutationLimit;
+    }
+
+}

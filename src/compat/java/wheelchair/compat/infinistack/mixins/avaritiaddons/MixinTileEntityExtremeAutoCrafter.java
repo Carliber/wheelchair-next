@@ -1,0 +1,18 @@
+package wheelchair.compat.mixins.avaritiaddons;
+
+import wheelchair.compat.helper.Configurables;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Pseudo;
+import org.spongepowered.asm.mixin.Overwrite;
+import wanion.avaritiaddons.block.extremeautocrafter.TileEntityExtremeAutoCrafter;
+
+@Mixin(TileEntityExtremeAutoCrafter.class)
+@Pseudo
+public abstract class MixinTileEntityExtremeAutoCrafter {
+
+    @Overwrite(remap = false)
+    public int func_70297_j_() {
+        return Configurables.maxStackSize;
+    }
+
+}

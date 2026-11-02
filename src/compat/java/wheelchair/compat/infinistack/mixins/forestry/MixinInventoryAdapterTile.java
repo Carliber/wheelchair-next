@@ -1,0 +1,23 @@
+package wheelchair.compat.mixins.forestry;
+
+import wheelchair.compat.helper.Configurables;
+import forestry.core.inventory.InventoryAdapterTile;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Pseudo;
+import org.spongepowered.asm.mixin.injection.ModifyConstant;
+import org.spongepowered.asm.mixin.injection.Constant;
+
+@Mixin(InventoryAdapterTile.class)
+@Pseudo
+public abstract class MixinInventoryAdapterTile {
+
+    @ModifyConstant(
+            method = "<init>(Lnet/minecraft/tileentity/TileEntity;ILjava/lang/String;)V",
+            constant = @Constant(intValue = 64),
+            remap = false
+    )
+    private static int modifyDefaultStackLimit(int original) {
+        return Configurables.maxStackSize;
+    }
+
+}

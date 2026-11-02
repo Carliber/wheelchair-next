@@ -1,0 +1,20 @@
+package wheelchair.compat.mixins.manametal;
+
+import project.studio.manametalmod.tileentity.TileEntityManaMake1; // tileentity\TileEntityManaMake1.java
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Pseudo;
+
+import org.spongepowered.asm.mixin.Overwrite;
+import wheelchair.compat.helper.Configurables;
+
+
+@Mixin(TileEntityManaMake1.class)
+@Pseudo
+public abstract class MixinTileEntityManaMake1 {
+
+    @Overwrite(remap = false)
+    public int func_70297_j_() {
+        return Configurables.maxStackSize;
+    }
+
+}

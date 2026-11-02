@@ -15,16 +15,18 @@ import net.minecraft.item.ItemStack;
 public class ContainerEnergy extends Container {
 
     public static final int INV_X = 43;
-    public static final int INV_LINE_Y = 164, INV_Y = 169, HOT_Y = 227;
 
-    public ContainerEnergy(InventoryPlayer playerInv) {
+    public ContainerEnergy(InventoryPlayer playerInv, int rows) {
+        if (rows < 3) rows = 3;
+        if (rows > 10) rows = 10;
+        int invY = 169 + (rows - 3) * 18, hotY = invY + 58;
         for (int r = 0; r < 3; r++) {
             for (int c = 0; c < 9; c++) {
-                addSlotToContainer(new wheelchair.inventory.ContainerStoragePage.SlotBig(playerInv, 9 + c + r * 9, INV_X + c * 18, INV_Y + r * 18));
+                addSlotToContainer(new wheelchair.inventory.ContainerStoragePage.SlotBig(playerInv, 9 + c + r * 9, INV_X + c * 18, invY + r * 18));
             }
         }
         for (int c = 0; c < 9; c++) {
-            addSlotToContainer(new wheelchair.inventory.ContainerStoragePage.SlotBig(playerInv, c, INV_X + c * 18, HOT_Y));
+            addSlotToContainer(new wheelchair.inventory.ContainerStoragePage.SlotBig(playerInv, c, INV_X + c * 18, hotY));
         }
     }
 

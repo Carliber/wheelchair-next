@@ -1,0 +1,22 @@
+package wheelchair.compat.mixins.forestry;
+
+import forestry.core.inventory.InventoryPlain;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Pseudo;
+import org.spongepowered.asm.mixin.injection.ModifyConstant;
+import org.spongepowered.asm.mixin.injection.Constant;
+import wheelchair.compat.helper.Configurables;
+
+@Mixin(InventoryPlain.class)
+@Pseudo
+public abstract class MixinInventoryPlain {
+
+    @ModifyConstant(
+            method = "<init>(ILjava/lang/String;)V",
+            constant = @Constant(intValue = 64),
+            remap = false
+    )
+    private static int modifyDefaultStackLimit(int original) {
+        return Configurables.maxStackSize;
+    }
+}

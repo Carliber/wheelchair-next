@@ -34,6 +34,8 @@ dependencies {
     // runtime the game dir provides UniMixins (the modpack ships it); our jar
     // only declares the tweaker + mixin config in its manifest
     compile files('libs/unimixins-all-1.7.10-0.2.1.jar')
+    // ported InfiniStack compat layer, precompiled (tools/build-compat)
+    compile files('libs/wheelchair-compat.jar')
 }
 
 // merge the embedded libs into the mod jar
@@ -43,7 +45,7 @@ jar {
                 // mixin: register our config; the tweaker itself comes from
                 // UniMixins in the game's mods dir at runtime (dev: runClient args)
                 'TweakClass': 'org.spongepowered.asm.launch.MixinTweaker',
-                'MixinConfigs': 'mixins.wheelchair.json',
+                'MixinConfigs': 'mixins.wheelchair.json,mixins.wheelchair.compat.json',
                 'ForceLoadAsMod': 'true',
                 'FMLCorePluginContainsFMLMod': 'true'
         )
@@ -60,7 +62,8 @@ runClient {
 // (dev classes carry MCP names; the refmap lets the same jar work reobfuscated)
 def mixinSrg = "${System.getProperty('user.home')}/.gradle/caches/minecraft/net/minecraftforge/forge/1.7.10-10.13.4.1614-1.7.10/srgs/mcp-srg.srg"
 def outRefMap = "${tasks.compileJava.temporaryDir}/mixins.wheelchair.refmap.json"
-tasks.compileJava.options.compilerArgs += ["-AreobfSrgFile=${mixinSrg}", "-AoutRefMapFile=${outRefMap}"]
+// compat jar (ported InfiniStack, precompiled by tools/build-compat) — no gradle wiring needed
+tasks.compileJava.options.compilerArgs += ["-AreobfSrgFile=${mixinSrg}", "-AoutRefMapFile=${outRefMap}", "-AdisableOverwriteChecker=true"]
 
 // The mixin AP only emits mappings for @Inject members — @Overwrite methods
 // (and we avoid @Shadow FIELDS entirely, see MixinItemStack) get NOTHING and
@@ -73,6 +76,30 @@ def refMapPatches = [
         'getInventoryStackLimit': 'Lnet/minecraft/inventory/InventoryBasic;func_70297_j_()I'],
     'wheelchair/mixin/MixinNetHandlerPlayServer': [
         'processCreativeInventoryAction': 'Lnet/minecraft/network/NetHandlerPlayServer;func_147344_a(Lnet/minecraft/network/play/client/C10PacketCreativeInventoryAction;)V'],
+    'wheelchair/mixin/MixinContainer': [
+        'slotClick': 'Lnet/minecraft/inventory/Container;func_75144_a(IIILnet/minecraft/entity/player/EntityPlayer;)Lnet/minecraft/item/ItemStack;'],
+    'wheelchair/mixin/MixinItemStack': [
+        'getMaxStackSize': 'Lnet/minecraft/item/ItemStack;func_77976_d()I'],
+    'wheelchair/mixin/MixinCommandGive': [
+        'processCommand': 'Lnet/minecraft/command/CommandGive;func_71515_b(Lnet/minecraft/command/ICommandSender;[Ljava/lang/String;)V'],
+    'wheelchair/mixin/MixinTileEntityFurnace': [
+        'getInventoryStackLimit': 'Lnet/minecraft/tileentity/TileEntityFurnace;func_70297_j_()I'],
+    'wheelchair/mixin/MixinTileEntityChest': [
+        'getInventoryStackLimit': 'Lnet/minecraft/tileentity/TileEntityChest;func_70297_j_()I'],
+    'wheelchair/mixin/MixinTileEntityDispenser': [
+        'getInventoryStackLimit': 'Lnet/minecraft/tileentity/TileEntityDispenser;func_70297_j_()I'],
+    'wheelchair/mixin/MixinTileEntityHopper': [
+        'getInventoryStackLimit': 'Lnet/minecraft/tileentity/TileEntityHopper;func_70297_j_()I'],
+    'wheelchair/mixin/MixinTileEntityBrewingStand': [
+        'getInventoryStackLimit': 'Lnet/minecraft/tileentity/TileEntityBrewingStand;func_70297_j_()I'],
+    'wheelchair/mixin/MixinEntityMinecartContainer': [
+        'getInventoryStackLimit': 'Lnet/minecraft/entity/item/EntityMinecartContainer;func_70297_j_()I'],
+    'wheelchair/mixin/MixinInventoryLargeChest': [
+        'getInventoryStackLimit': 'Lnet/minecraft/inventory/InventoryLargeChest;func_70297_j_()I'],
+    'wheelchair/mixin/MixinInventoryCrafting': [
+        'getInventoryStackLimit': 'Lnet/minecraft/inventory/InventoryCrafting;func_70297_j_()I'],
+    'wheelchair/mixin/MixinInventoryCraftResult': [
+        'getInventoryStackLimit': 'Lnet/minecraft/inventory/InventoryCraftResult;func_70297_j_()I'],
 ]
 task patchRefMap {
     doLast {
@@ -95,6 +122,7 @@ task patchRefMap {
 jar {
     dependsOn patchRefMap
     from outRefMap
+    from zipTree('libs/wheelchair-compat.jar')
 }
 
 version = "0.3.0"

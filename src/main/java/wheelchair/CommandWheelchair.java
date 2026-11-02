@@ -59,7 +59,7 @@ public class CommandWheelchair extends CommandBase {
         if (sub.equals("mark")) { mark(p, args); return; }
         if (sub.equals("wcst")) { // dev aid: cycle the staff top mode (same write the Shift+right-click does)
             wheelchair.value.StaffProfile prof = wheelchair.value.StaffProfile.get(p.worldObj);
-            prof.topMode = (prof.topMode + 1) % 3;
+            prof.topMode = (prof.topMode + 1) % 5;
             prof.markDirty();
             wheelchair.WheelchairMod.network.sendTo(
                     new wheelchair.network.PacketStaffCfgSync(prof), p);
@@ -69,6 +69,19 @@ public class CommandWheelchair extends CommandBase {
         }
         if (sub.equals("wce")) {
             p.openGui(wheelchair.WheelchairMod.instance, 6, p.worldObj, 0, 0, 0);
+            return;
+        }
+        if (sub.equals("wca")) {
+            wheelchair.value.AccelHub hub = wheelchair.value.AccelHub.get();
+            if (hub == null) return;
+            p.addChatMessage(new ChatComponentText("accel on=" + hub.on + " marks=" + hub.marks.size()));
+            for (int i = 0; i < hub.marks.size(); i++) {
+                wheelchair.value.AccelHub.Mark m = hub.marks.get(i);
+                p.addChatMessage(new ChatComponentText("accel " + (m.isEntity ? ("ent " + m.entityId) : (m.dim + " " + m.x + " " + m.y + " " + m.z))
+                        + " r" + m.radius + " x" + m.rate
+                        + " left=" + (m.remain < 0 ? "永久" : (m.remain / 20 + "s"))
+                        + (m.isEntity ? "" : " cov=" + m.cov)));
+            }
             return;
         }
         if (sub.equals("wcp")) {
@@ -208,7 +221,7 @@ public class CommandWheelchair extends CommandBase {
             r = hub.staffClick(p.worldObj, x, y, z); // real staff gesture path
         }
         wheelchair.network.EnergyNet.broadcast(hub, p.worldObj);
-        p.addChatMessage(new ChatComponentText("mark -> " + r + " (0 not-machine 1 marked 3 toggled)"));
+        p.addChatMessage(new ChatComponentText("mark -> " + r + " (0 not-machine 1 marked 3 toggled 4 unmarked)"));
     }
 
     /** /wheelchair debugfill [count] — dev aid: fill the storage with vanilla items in
@@ -329,6 +342,33 @@ public class CommandWheelchair extends CommandBase {
         } else if (op.equals("clear")) {
             for (int i = 0; i < bot.inventory.mainInventory.length; i++) bot.inventory.mainInventory[i] = null;
             sender.addChatMessage(new ChatComponentText("bot inventory cleared"));
+        } else if (op.equals("furnace")) {
+            // test rig: a furnace TE + open container — big-stack slotClick repro
+            net.minecraft.tileentity.TileEntityFurnace te = new net.minecraft.tileentity.TileEntityFurnace();
+            te.setWorldObj(w);
+            bot.openContainer = new net.minecraft.inventory.ContainerFurnace(bot.inventory, te);
+            sender.addChatMessage(new ChatComponentText("bot furnace container open (slots 0=in 1=fuel 2=out)"));
+        } else if (op.equals("click")) {
+            // click <slot> <button> <mode> — run the REAL server slotClick path
+            if (bot.openContainer == null) { sender.addChatMessage(new ChatComponentText("no container open")); return; }
+            int slot = 1, button = 0, cmode = 0;
+            try { slot = Integer.parseInt(a1); } catch (Exception ignored) {}
+            try { button = Integer.parseInt(a2); } catch (Exception ignored) {}
+            bot.openContainer.slotClick(slot, button, cmode, bot);
+            sender.addChatMessage(new ChatComponentText("clicked slot=" + slot + " button=" + button));
+        } else if (op.equals("slots")) {
+            if (bot.openContainer == null) { sender.addChatMessage(new ChatComponentText("no container open")); return; }
+            StringBuilder s2 = new StringBuilder("slots:");
+            for (int i = 0; i < bot.openContainer.inventorySlots.size(); i++) {
+                net.minecraft.inventory.Slot s = (net.minecraft.inventory.Slot) bot.openContainer.inventorySlots.get(i);
+                ItemStack st = s.getStack();
+                s2.append(" [").append(i).append(":")
+                 .append(st == null ? "null" : st.stackSize + "x" + st.getDisplayName()).append("]");
+            }
+            ItemStack cur = bot.inventory.getItemStack();
+            s2.append(" cursor=").append(cur == null ? "null" : cur.stackSize + "x" + cur.getDisplayName());
+            cpw.mods.fml.common.FMLLog.info("[wheelchair] BOT %s", new Object[]{s2.toString()});
+            sender.addChatMessage(new ChatComponentText(s2.toString()));
         }
         // state is always printed
         StringBuilder sb = new StringBuilder("BOT state: inv=[");

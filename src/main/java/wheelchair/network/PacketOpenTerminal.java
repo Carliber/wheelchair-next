@@ -28,7 +28,7 @@ public class PacketOpenTerminal implements IMessage {
             ServerTaskQueue.add(new Runnable() {
                 public void run() {
                     net.minecraft.entity.player.EntityPlayerMP p = ctx.getServerHandler().playerEntity;
-                    if (msg.guiId != 0 && msg.guiId != 4 && msg.guiId != 5 && msg.guiId != 6) return; // storage + ench + staff + energy
+                    if (msg.guiId != 0 && msg.guiId != 4 && msg.guiId != 5 && msg.guiId != 6 && msg.guiId != 7) return; // storage + ench + staff + energy + accel
                     int rows = msg.rows;
                     if (rows < 3) rows = 3;
                     if (rows > 10) rows = 10;

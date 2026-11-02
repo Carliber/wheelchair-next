@@ -1,0 +1,20 @@
+package wheelchair.compat.mixins.manametal;
+
+import project.studio.manametalmod.tileentity.TileEntityEXPExtractor; // tileentity\TileEntityEXPExtractor.java
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Pseudo;
+
+import org.spongepowered.asm.mixin.Overwrite;
+import wheelchair.compat.helper.Configurables;
+
+
+@Mixin(TileEntityEXPExtractor.class)
+@Pseudo
+public abstract class MixinTileEntityEXPExtractor {
+
+    @Overwrite(remap = false)
+    public int func_70297_j_() {
+        return Configurables.maxStackSize;
+    }
+
+}

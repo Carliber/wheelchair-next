@@ -76,7 +76,7 @@ public class GuiStoragePage extends GuiContainer implements VirtualSlotHost {
     private static final String[] SORTS = {"名称", "数量", "类型", "创造"};
     private static final String[] TYPE_NAMES = {"全部", "物品", "其他"};
     private static final String[] NBT_NAMES = {"全部", "无NBT", "有NBT"};
-    private static final String[] RAIL_TABS = {"存储", "附魔", "能源"};
+    private static final String[] RAIL_TABS = {"存储", "附魔", "能源", "加速"};
     private static final String[] RAIL_PIN = {"手杖", "设置"};
 
     // ---- adaptive layout (recomputed for the row count) ----
@@ -810,7 +810,7 @@ public class GuiStoragePage extends GuiContainer implements VirtualSlotHost {
                 net.minecraft.client.gui.ScaledResolution sr =
                         new net.minecraft.client.gui.ScaledResolution(this.mc, this.mc.displayWidth, this.mc.displayHeight);
                 wheelchair.WheelchairMod.network.sendToServer(
-                        new wheelchair.network.PacketOpenTerminal(i == 1 ? 4 : 6,
+                        new wheelchair.network.PacketOpenTerminal(i == 1 ? 4 : (i == 2 ? 6 : 7),
                                 wheelchair.client.GuiStoragePage.rowsFor(sr.getScaledHeight())));
                 return;
             }

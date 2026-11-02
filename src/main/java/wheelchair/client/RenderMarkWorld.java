@@ -3,6 +3,7 @@ package wheelchair.client;
 import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.util.Vec3;
 import org.lwjgl.opengl.GL11;
+import wheelchair.network.AccelMirror;
 import wheelchair.network.EnergyMirror;
 
 /**
@@ -17,13 +18,7 @@ public final class RenderMarkWorld {
 
     public static void draw(double camX, double camY, double camZ, long tick) {
         if (EnergyMirror.rows.isEmpty()) return;
-        GL11.glPushMatrix();
-        GL11.glTranslated(-camX, -camY, -camZ);
-        GL11.glDisable(GL11.GL_TEXTURE_2D);
-        GL11.glDisable(GL11.GL_CULL_FACE);
-        GL11.glEnable(GL11.GL_BLEND);
-        GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
-        GL11.glDepthMask(false);
+        begin(camX, camY, camZ);
         float breathe = 0.10F + 0.08F * (float) Math.sin(tick * 0.12D); // glow pulse
 
         for (int i = 0; i < EnergyMirror.rows.size(); i++) {
@@ -42,6 +37,39 @@ public final class RenderMarkWorld {
             wire(x, y, z, cr, cg, cb, store ? 0.9F : 0.8F);
         }
 
+        end();
+    }
+
+    /** accel marks: steady translucent-blue centre block + radius wire box
+     *  (block marks only — entity marks move, GUI-only) */
+    public static void drawAccel(double camX, double camY, double camZ) {
+        if (AccelMirror.rows.isEmpty()) return;
+        begin(camX, camY, camZ);
+        int dim = net.minecraft.client.Minecraft.getMinecraft().theWorld.provider.dimensionId;
+        for (int i = 0; i < AccelMirror.rows.size(); i++) {
+            Object[] r = AccelMirror.rows.get(i);
+            if (((Boolean) r[0]).booleanValue()) continue;           // entity marks: no box
+            if (((Integer) r[1]).intValue() != dim) continue;
+            int x = ((Integer) r[2]).intValue(), y = ((Integer) r[3]).intValue(), z = ((Integer) r[4]).intValue();
+            int rad = ((Integer) r[6]).intValue();
+            box(x, y, z, 0.25F, 0.78F, 1.0F, 0.22F);
+            wireBox(x - rad, Math.max(0, y - rad), z - rad,
+                    x + rad + 1, Math.min(255, y + rad) + 1, z + rad + 1, 0.25F, 0.78F, 1.0F, 0.8F);
+        }
+        end();
+    }
+
+    private static void begin(double camX, double camY, double camZ) {
+        GL11.glPushMatrix();
+        GL11.glTranslated(-camX, -camY, -camZ);
+        GL11.glDisable(GL11.GL_TEXTURE_2D);
+        GL11.glDisable(GL11.GL_CULL_FACE);
+        GL11.glEnable(GL11.GL_BLEND);
+        GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
+        GL11.glDepthMask(false);
+    }
+
+    private static void end() {
         GL11.glDepthMask(true);
         GL11.glDisable(GL11.GL_BLEND);
         GL11.glEnable(GL11.GL_CULL_FACE);
@@ -70,7 +98,13 @@ public final class RenderMarkWorld {
 
     private static void wire(int x, int y, int z, float r, float g, float b, float a) {
         double e = 0.004D;
-        double x0 = x - e, y0 = y - e, z0 = z - e, x1 = x + 1 + e, y1 = y + 1 + e, z1 = z + 1 + e;
+        wireBox(x - e, y - e, z - e, x + 1 + e, y + 1 + e, z + 1 + e, r, g, b, a);
+    }
+
+    /** wire box for an arbitrary region (world coords, double) */
+    private static void wireBox(double x0, double y0, double z0,
+                                double x1, double y1, double z1,
+                                float r, float g, float b, float a) {
         Tessellator t = Tessellator.instance;
         GL11.glLineWidth(2.0F);
         t.startDrawing(GL11.GL_LINES);

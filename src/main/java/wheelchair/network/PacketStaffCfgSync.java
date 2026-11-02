@@ -17,6 +17,7 @@ public class PacketStaffCfgSync implements IMessage {
     public int range;
     public int shape;
     public int mode;
+    public int time;
 
     public PacketStaffCfgSync() {}
 
@@ -27,6 +28,7 @@ public class PacketStaffCfgSync implements IMessage {
         range = p.range;
         shape = p.shape;
         mode = p.mode;
+        time = p.time;
     }
 
     @Override
@@ -37,6 +39,7 @@ public class PacketStaffCfgSync implements IMessage {
         range = buf.readByte();
         shape = buf.readByte();
         mode = buf.readByte();
+        time = buf.readInt();
     }
 
     @Override
@@ -47,6 +50,7 @@ public class PacketStaffCfgSync implements IMessage {
         buf.writeByte(range);
         buf.writeByte(shape);
         buf.writeByte(mode);
+        buf.writeInt(time);
     }
 
     public static class Handler implements IMessageHandler<PacketStaffCfgSync, IMessage> {
@@ -60,7 +64,8 @@ public class PacketStaffCfgSync implements IMessage {
                     wheelchair.value.StaffProfile.cRange = msg.range;
                     wheelchair.value.StaffProfile.cShape = msg.shape;
                     wheelchair.value.StaffProfile.cMode = msg.mode;
-                    wheelchair.value.StaffProfile.cVersion++;
+                    wheelchair.value.StaffProfile.cTime = msg.time;
+                    wheelchair.value.StaffProfile.cVersion++; 
                 }
             });
             return null;

@@ -16,16 +16,18 @@ public class PacketStaffCfg implements IMessage {
     public int range;
     public int shape;
     public int mode;
+    public int time; // 加速时长(秒) -1=永久
 
     public PacketStaffCfg() {}
 
-    public PacketStaffCfg(boolean silk, int fortune, int topMode, int range, int shape, int mode) {
+    public PacketStaffCfg(boolean silk, int fortune, int topMode, int range, int shape, int mode, int time) {
         this.silk = silk;
         this.fortune = fortune;
         this.topMode = topMode;
         this.range = range;
         this.shape = shape;
         this.mode = mode;
+        this.time = time;
     }
 
     @Override
@@ -36,6 +38,7 @@ public class PacketStaffCfg implements IMessage {
         range = buf.readByte();
         shape = buf.readByte();
         mode = buf.readByte();
+        time = buf.readInt();
     }
 
     @Override
@@ -46,6 +49,7 @@ public class PacketStaffCfg implements IMessage {
         buf.writeByte(range);
         buf.writeByte(shape);
         buf.writeByte(mode);
+        buf.writeInt(time);
     }
 
     public static class Handler implements IMessageHandler<PacketStaffCfg, IMessage> {
@@ -56,7 +60,7 @@ public class PacketStaffCfg implements IMessage {
                     try {
                         net.minecraft.entity.player.EntityPlayerMP p = ctx.getServerHandler().playerEntity;
                         wheelchair.value.StaffProfile.get(p.worldObj)
-                                .apply(msg.silk, msg.fortune, msg.topMode, msg.range, msg.shape, msg.mode);
+                                .apply(msg.silk, msg.fortune, msg.topMode, msg.range, msg.shape, msg.mode, msg.time);
                     } catch (Throwable t) {
                         cpw.mods.fml.common.FMLLog.warning("[wheelchair] staff cfg failed: %s",
                                 new Object[]{String.valueOf(t)});

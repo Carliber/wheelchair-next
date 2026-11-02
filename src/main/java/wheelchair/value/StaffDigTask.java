@@ -261,16 +261,17 @@ public class StaffDigTask {
             this.meta = w.getBlockMetadata(x, y, z);
             queue.add(new int[]{x, y, z});
             seen.add(pack(x, y, z));
-            pending = new int[]{x, y, z};
         }
 
         public boolean hasNext() {
             if (pending != null) return true;
             while (!queue.isEmpty()) {
                 int[] c = queue.poll();
-                for (int dx = -1; dx <= 1 && pending == null; dx++)
-                    for (int dy = -1; dy <= 1 && pending == null; dy++)
-                        for (int dz = -1; dz <= 1 && pending == null; dz++) {
+                // scan ALL 26 neighbours of c (the old loop stopped at the first
+                // match, collapsing the flood into a single chain)
+                for (int dx = -1; dx <= 1; dx++)
+                    for (int dy = -1; dy <= 1; dy++)
+                        for (int dz = -1; dz <= 1; dz++) {
                             if (dx == 0 && dy == 0 && dz == 0) continue;
                             int nx = c[0] + dx, ny = c[1] + dy, nz = c[2] + dz;
                             if (Math.abs(nx - ox) > range || Math.abs(ny - oy) > range || Math.abs(nz - oz) > range)
@@ -279,12 +280,13 @@ public class StaffDigTask {
                             if (seen.contains(p)) continue;
                             seen.add(p);
                             if (w.getBlock(nx, ny, nz) == block && w.getBlockMetadata(nx, ny, nz) == meta) {
-                                pending = new int[]{nx, ny, nz};
-                                queue.add(pending);
+                                queue.add(new int[]{nx, ny, nz});
                             }
                         }
+                pending = c; // c is due for mining; its whole neighbourhood is queued
+                return true;
             }
-            return pending != null;
+            return false;
         }
 
         public int[] next() {

@@ -36,7 +36,13 @@ public class CommonProxy implements cpw.mods.fml.common.network.IGuiHandler {
             // energy page: push the mark mirror so the GUI starts from the truth
             wheelchair.value.EnergyMarkHub hub = wheelchair.value.EnergyMarkHub.get();
             if (hub != null) wheelchair.network.EnergyNet.broadcast(hub, w);
-            return new wheelchair.inventory.ContainerEnergy(p.inventory);
+            return new wheelchair.inventory.ContainerEnergy(p.inventory, Math.max(3, Math.min(10, x)));
+        }
+        if (id == 7 && p instanceof net.minecraft.entity.player.EntityPlayerMP) {
+            // accel page: push the mark mirror so the GUI starts from the truth
+            wheelchair.value.AccelHub hub = wheelchair.value.AccelHub.get();
+            if (hub != null) wheelchair.network.AccelNet.broadcast(hub);
+            return new wheelchair.inventory.ContainerAccel(p.inventory, Math.max(3, Math.min(10, x)));
         }
         return null;
     }

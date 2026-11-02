@@ -48,24 +48,29 @@ public class GuiEnergyPage extends GuiContainer {
     private static final int LIST_Y = 34;          // first row top
     private static final int ROW_H = 24;           // pitch (原型 72/3)
     private static final int CARD_H = 22;          // 行卡高 (原型 66/3)
-    private static final int ROWS_VIS = 5;         // 5×24=120 → 34..154
     private static final int SB_W = 8, KNOB_W = 4, KNOB_H = 24;
-    private static final int SB_H = ROWS_VIS * ROW_H - 4; // 116
 
     private static final int X_W = 12, X_H = 12, X_X = CR - 12 - 6; // 内容右缘内收 6 (原型 right:6px/3)
 
     private static final int INV_X = 43;
-    private static final int INV_LINE_Y = 164, INV_Y = 169, HOT_Y = 227;
 
-    private static final String[] RAIL_TABS = {"存储", "附魔", "能源"};
+    private static final String[] RAIL_TABS = {"存储", "附魔", "能源", "加速"};
     private static final String[] RAIL_PIN = {"手杖", "设置"};
 
     private int scroll;
+    private final int rowsVis;          // visible list rows (grows with rows)
+    private final int invLineY, invY, hotY; // inventory band, anchored to the bottom
 
-    public GuiEnergyPage(ContainerEnergy c) {
+    public GuiEnergyPage(ContainerEnergy c, int rows) {
         super(c);
+        if (rows < 3) rows = 3;
+        if (rows > 10) rows = 10;
         xSize = 214;
-        ySize = 251;
+        ySize = 251 + (rows - 3) * 18;   // storage-page law: every extra row +18
+        rowsVis = 5 + (rows - 3);
+        hotY = ySize - 24;
+        invY = ySize - 82;
+        invLineY = ySize - 87;
     }
 
     // ---------------- background ----------------
@@ -88,7 +93,7 @@ public class GuiEnergyPage extends GuiContainer {
         fontRendererObj.drawString("标记机器 (" + EnergyMirror.rows.size() + ")", x + CX, y + LBL_Y, COL_TEXT);
 
         // rows
-        for (int i = 0; i < ROWS_VIS; i++) {
+        for (int i = 0; i < rowsVis; i++) {
             int idx = scroll + i;
             if (idx >= EnergyMirror.rows.size()) break;
             Object[] r = EnergyMirror.rows.get(idx);
@@ -96,25 +101,26 @@ public class GuiEnergyPage extends GuiContainer {
             drawRow(x, ry, r, mx, my);
         }
 
+        int sbH = rowsVis * ROW_H - 4;
         // scrollbar (storage-page widget law), flush to the content right edge
-        int maxScroll = EnergyMirror.rows.size() - ROWS_VIS;
+        int maxScroll = EnergyMirror.rows.size() - rowsVis;
         if (maxScroll > 0) {
             int sx = x + CR, sy = y + LIST_Y;
-            drawRect(sx, sy, sx + SB_W, sy + SB_H, COL_SLOT);
-            drawRect(sx, sy, sx + SB_W - 1, sy + SB_H - 1, COL_SLOT_DK);
-            drawRect(sx, sy + SB_H - 1, sx + SB_W, sy + SB_H, COL_BEV_HI);
-            drawRect(sx + SB_W - 1, sy, sx + SB_W, sy + SB_H, COL_BEV_HI);
-            int ky = sy + 2 + (SB_H - 4 - KNOB_H) * scroll / maxScroll;
+            drawRect(sx, sy, sx + SB_W, sy + sbH, COL_SLOT);
+            drawRect(sx, sy, sx + SB_W - 1, sy + sbH - 1, COL_SLOT_DK);
+            drawRect(sx, sy + sbH - 1, sx + SB_W, sy + sbH, COL_BEV_HI);
+            drawRect(sx + SB_W - 1, sy, sx + SB_W, sy + sbH, COL_BEV_HI);
+            int ky = sy + 2 + (sbH - 4 - KNOB_H) * scroll / maxScroll;
             drawRect(sx + 2, ky, sx + 2 + KNOB_W, ky + KNOB_H, COL_BG);
             drawRect(sx + 2, ky, sx + 2 + KNOB_W, ky + 1, COL_BEV_HI);
             drawRect(sx + 2, ky + KNOB_H - 1, sx + 2 + KNOB_W, ky + KNOB_H, COL_BEV_LO);
         }
 
         // inventory band (storage-page law: panel-wide rule + 3x9 + hotbar)
-        drawRect(x + PANEL_X, y + INV_LINE_Y, x + xSize - FRAME, y + INV_LINE_Y + 2, COL_SEP);
+        drawRect(x + PANEL_X, y + invLineY, x + xSize - FRAME, y + invLineY + 2, COL_SEP);
         for (int rr = 0; rr < 3; rr++)
-            for (int c = 0; c < 9; c++) slotRect(x + INV_X + c * 18, y + INV_Y + rr * 18);
-        for (int c = 0; c < 9; c++) slotRect(x + INV_X + c * 18, y + HOT_Y);
+            for (int c = 0; c < 9; c++) slotRect(x + INV_X + c * 18, y + invY + rr * 18);
+        for (int c = 0; c < 9; c++) slotRect(x + INV_X + c * 18, y + hotY);
 
         // rail (energy tab active)
         for (int i = 0; i < RAIL_TABS.length; i++)
@@ -159,7 +165,7 @@ public class GuiEnergyPage extends GuiContainer {
 
     @Override
     protected void drawGuiContainerForegroundLayer(int mx, int my) {
-        for (int i = 0; i < ROWS_VIS; i++) {
+        for (int i = 0; i < rowsVis; i++) {
             int idx = scroll + i;
             if (idx >= EnergyMirror.rows.size()) break;
             Object[] r = EnergyMirror.rows.get(idx);
@@ -234,7 +240,7 @@ public class GuiEnergyPage extends GuiContainer {
         super.handleMouseInput();
         int d = Mouse.getEventDWheel();
         if (d != 0) {
-            int max = Math.max(0, EnergyMirror.rows.size() - ROWS_VIS);
+            int max = Math.max(0, EnergyMirror.rows.size() - rowsVis);
             scroll = Math.max(0, Math.min(max, scroll - Integer.signum(d)));
         }
     }
@@ -242,12 +248,13 @@ public class GuiEnergyPage extends GuiContainer {
     @Override
     protected void mouseClicked(int mx, int my, int button) {
         int x = (width - xSize) / 2, y = (height - ySize) / 2;
-        // rail navigation (top tabs: 0 storage 1 ench 2 energy=self)
+        // rail navigation (top tabs: 0 storage 1 ench 2 energy=self 3 accel)
         for (int i = 0; i < RAIL_TABS.length; i++) {
             if (i != 2 && inRect(mx, my, x + RAIL_X + 1, y + 6 + i * 17, 26, 15)) {
                 net.minecraft.client.gui.ScaledResolution sr =
                         new net.minecraft.client.gui.ScaledResolution(this.mc, this.mc.displayWidth, this.mc.displayHeight);
-                WheelchairMod.network.sendToServer(new PacketOpenTerminal(i == 0 ? 0 : 4,
+                WheelchairMod.network.sendToServer(new PacketOpenTerminal(
+                        i == 0 ? 0 : (i == 1 ? 4 : 7),
                         GuiStoragePage.rowsFor(sr.getScaledHeight())));
                 return;
             }
@@ -263,7 +270,7 @@ public class GuiEnergyPage extends GuiContainer {
             }
         }
         // [X] unmark
-        for (int i = 0; i < ROWS_VIS; i++) {
+        for (int i = 0; i < rowsVis; i++) {
             int idx = scroll + i;
             if (idx >= EnergyMirror.rows.size()) break;
             Object[] r = EnergyMirror.rows.get(idx);
